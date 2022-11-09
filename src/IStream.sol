@@ -4,6 +4,7 @@ pragma solidity ^0.8.17;
 
 interface IStream {
     function initialize(
+        address payer,
         address recipient,
         uint256 deposit,
         address tokenAddress,

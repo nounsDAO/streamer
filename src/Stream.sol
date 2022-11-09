@@ -13,7 +13,7 @@ import { IStream } from "./IStream.sol";
 contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
     using SafeERC20 for IERC20;
 
-    Types.Stream stream;
+    Types.Stream public stream;
 
     event CreateStream(
         address indexed sender,
@@ -27,6 +27,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
     event WithdrawFromStream(address indexed recipient, uint256 amount);
 
     function initialize(
+        address payer,
         address recipient,
         uint256 deposit,
         address tokenAddress,
@@ -62,13 +63,13 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
             isEntity: true,
             ratePerSecond: vars.ratePerSecond,
             recipient: recipient,
-            sender: msg.sender,
+            payer: payer,
             startTime: startTime,
             stopTime: stopTime,
             tokenAddress: tokenAddress
         });
 
-        emit CreateStream(msg.sender, recipient, deposit, tokenAddress, startTime, stopTime);
+        emit CreateStream(payer, recipient, deposit, tokenAddress, startTime, stopTime);
     }
 
     struct CreateStreamLocalVars {
@@ -82,7 +83,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
      */
     modifier onlySenderOrRecipient() {
         require(
-            msg.sender == stream.sender || msg.sender == stream.recipient,
+            msg.sender == stream.payer || msg.sender == stream.recipient,
             "caller is not the sender or the recipient of the stream"
         );
         _;
@@ -143,7 +144,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
         }
 
         if (who == stream.recipient) return vars.recipientBalance;
-        if (who == stream.sender) {
+        if (who == stream.payer) {
             (vars.mathErr, vars.senderBalance) =
                 subUInt(stream.remainingBalance, vars.recipientBalance);
             /* `recipientBalance` cannot and should not be bigger than `remainingBalance`. */

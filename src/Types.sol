@@ -14,7 +14,7 @@ library Types {
         uint256 startTime;
         uint256 stopTime;
         address recipient;
-        address sender;
+        address payer;
         address tokenAddress;
         bool isEntity;
     }
