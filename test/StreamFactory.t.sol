@@ -69,7 +69,7 @@ contract StreamFactoryTest is Test {
 
     function test_createStream_setsPayerParamAsStreamPayer() public {
         uint256 startTime = 1640988000;
-        uint256 stopTime = 1672524000; 
+        uint256 stopTime = 1672524000;
         uint256 deposit = 999975024000;
         address payer = address(0x4242);
 
@@ -84,7 +84,7 @@ contract StreamFactoryTest is Test {
 
     function test_createStream_defaultPayerIsMsgSender() public {
         uint256 startTime = 1640988000;
-        uint256 stopTime = 1672524000; 
+        uint256 stopTime = 1672524000;
         uint256 deposit = 999975024000;
 
         address newStream =
@@ -98,7 +98,7 @@ contract StreamFactoryTest is Test {
 
     function test_createStream_differentSenderCantFrontrunToFailCreation() public {
         uint256 startTime = 1640988000;
-        uint256 stopTime = 1672524000; 
+        uint256 stopTime = 1672524000;
         uint256 deposit = 999975024000;
         address honestSender = address(0x4242);
         address frontrunner = address(0x1234);
