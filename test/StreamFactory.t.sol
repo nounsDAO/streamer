@@ -9,6 +9,16 @@ import { Stream } from "../src/Stream.sol";
 import { IStream } from "../src/IStream.sol";
 
 contract StreamFactoryTest is Test {
+    event StreamCreated(
+        address indexed payer,
+        address indexed recipient,
+        uint256 tokenAmount,
+        address tokenAddress,
+        uint256 startTime,
+        uint256 stopTime,
+        address streamAddress
+    );
+
     StreamFactory factory;
 
     address recipient = address(0x1001);
@@ -73,7 +83,14 @@ contract StreamFactoryTest is Test {
         uint256 stopTime = 1672524000;
         uint256 tokenAmount = 999975024000;
         address payer = address(0x4242);
+        address predictedStream = factory.predictStreamAddress(
+            address(this), recipient, tokenAmount, address(token), startTime, stopTime
+        );
 
+        vm.expectEmit(true, true, true, true);
+        emit StreamCreated(
+            payer, recipient, tokenAmount, address(token), startTime, stopTime, predictedStream
+            );
         address newStream =
             factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
 
@@ -104,11 +121,37 @@ contract StreamFactoryTest is Test {
         address honestSender = address(0x4242);
         address frontrunner = address(0x1234);
 
+        address predictedStream = factory.predictStreamAddress(
+            frontrunner, recipient, tokenAmount, address(token), startTime, stopTime
+        );
+        vm.expectEmit(true, true, true, true);
+        emit StreamCreated(
+            honestSender,
+            recipient,
+            tokenAmount,
+            address(token),
+            startTime,
+            stopTime,
+            predictedStream
+            );
         vm.prank(frontrunner);
         factory.createStream(
             honestSender, recipient, tokenAmount, address(token), startTime, stopTime
         );
 
+        predictedStream = factory.predictStreamAddress(
+            honestSender, recipient, tokenAmount, address(token), startTime, stopTime
+        );
+        vm.expectEmit(true, true, true, true);
+        emit StreamCreated(
+            honestSender,
+            recipient,
+            tokenAmount,
+            address(token),
+            startTime,
+            stopTime,
+            predictedStream
+            );
         vm.prank(honestSender);
         factory.createStream(
             honestSender, recipient, tokenAmount, address(token), startTime, stopTime

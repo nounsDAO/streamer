@@ -6,6 +6,16 @@ import { Clones } from "openzeppelin-contracts/proxy/Clones.sol";
 import { IStream } from "./IStream.sol";
 
 contract StreamFactory {
+    event StreamCreated(
+        address indexed payer,
+        address indexed recipient,
+        uint256 tokenAmount,
+        address tokenAddress,
+        uint256 startTime,
+        uint256 stopTime,
+        address streamAddress
+    );
+
     address immutable streamImplementation;
 
     constructor(address streamImplementation_) {
@@ -35,6 +45,8 @@ contract StreamFactory {
         );
         stream = Clones.cloneDeterministic(streamImplementation, salt);
         IStream(stream).initialize(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
+
+        emit StreamCreated(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, stream);
     }
 
     function predictStreamAddress(
