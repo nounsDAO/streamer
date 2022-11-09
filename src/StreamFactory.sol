@@ -14,39 +14,39 @@ contract StreamFactory {
 
     function createStream(
         address recipient,
-        uint256 deposit,
+        uint256 tokenAmount,
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
     ) public returns (address stream) {
-        return createStream(msg.sender, recipient, deposit, tokenAddress, startTime, stopTime);
+        return createStream(msg.sender, recipient, tokenAmount, tokenAddress, startTime, stopTime);
     }
 
     function createStream(
         address payer,
         address recipient,
-        uint256 deposit,
+        uint256 tokenAmount,
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
     ) public returns (address stream) {
         bytes32 salt = keccak256(
-            abi.encodePacked(msg.sender, recipient, deposit, tokenAddress, startTime, stopTime)
+            abi.encodePacked(msg.sender, recipient, tokenAmount, tokenAddress, startTime, stopTime)
         );
         stream = Clones.cloneDeterministic(streamImplementation, salt);
-        IStream(stream).initialize(payer, recipient, deposit, tokenAddress, startTime, stopTime);
+        IStream(stream).initialize(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
     }
 
     function predictStreamAddress(
         address msgSender,
         address recipient,
-        uint256 deposit,
+        uint256 tokenAmount,
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
     ) public view returns (address) {
         bytes32 salt = keccak256(
-            abi.encodePacked(msgSender, recipient, deposit, tokenAddress, startTime, stopTime)
+            abi.encodePacked(msgSender, recipient, tokenAmount, tokenAddress, startTime, stopTime)
         );
         return Clones.predictDeterministicAddress(streamImplementation, salt);
     }

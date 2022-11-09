@@ -24,12 +24,13 @@ contract StreamFactoryTest is Test {
     function testStream() public {
         uint256 startTime = 1640988000; // 2022-01-01 00:00:00
         uint256 stopTime = 1672524000; // 2023-01-01 00:00:00
-        uint256 deposit = 999975024000; // ~1M * 1e6
+        uint256 tokenAmount = 999975024000; // ~1M * 1e6
 
         vm.warp(startTime);
 
-        IStream stream =
-            IStream(factory.createStream(recipient, deposit, address(token), startTime, stopTime));
+        IStream stream = IStream(
+            factory.createStream(recipient, tokenAmount, address(token), startTime, stopTime)
+        );
 
         vm.warp(startTime + 30 days);
 
@@ -37,7 +38,7 @@ contract StreamFactoryTest is Test {
         vm.expectRevert("ERC20: transfer amount exceeds balance");
         stream.withdrawFromStream(10_000e6);
 
-        token.mint(address(stream), deposit);
+        token.mint(address(stream), tokenAmount);
 
         vm.prank(recipient);
         stream.withdrawFromStream(10_000e6);
@@ -48,15 +49,15 @@ contract StreamFactoryTest is Test {
     function testFundingStreamLikeInProposal() public {
         uint256 startTime = 1640988000; // 2022-01-01 00:00:00
         uint256 stopTime = 1672524000; // 2023-01-01 00:00:00
-        uint256 deposit = 999975024000; // ~1M * 1e6
+        uint256 tokenAmount = 999975024000; // ~1M * 1e6
 
         address predictedAddress = factory.predictStreamAddress(
-            address(this), recipient, deposit, address(token), startTime, stopTime
+            address(this), recipient, tokenAmount, address(token), startTime, stopTime
         );
 
         // Proposal would do these txs
-        IStream(factory.createStream(recipient, deposit, address(token), startTime, stopTime));
-        token.mint(predictedAddress, deposit);
+        IStream(factory.createStream(recipient, tokenAmount, address(token), startTime, stopTime));
+        token.mint(predictedAddress, tokenAmount);
         // End proposal
 
         vm.warp(startTime + 30 days);
@@ -70,11 +71,11 @@ contract StreamFactoryTest is Test {
     function test_createStream_setsPayerParamAsStreamPayer() public {
         uint256 startTime = 1640988000;
         uint256 stopTime = 1672524000;
-        uint256 deposit = 999975024000;
+        uint256 tokenAmount = 999975024000;
         address payer = address(0x4242);
 
         address newStream =
-            factory.createStream(payer, recipient, deposit, address(token), startTime, stopTime);
+            factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
 
         Stream s = Stream(newStream);
         (,,,,,, address actualPayer,,) = s.stream();
@@ -85,10 +86,10 @@ contract StreamFactoryTest is Test {
     function test_createStream_defaultPayerIsMsgSender() public {
         uint256 startTime = 1640988000;
         uint256 stopTime = 1672524000;
-        uint256 deposit = 999975024000;
+        uint256 tokenAmount = 999975024000;
 
         address newStream =
-            factory.createStream(recipient, deposit, address(token), startTime, stopTime);
+            factory.createStream(recipient, tokenAmount, address(token), startTime, stopTime);
 
         Stream s = Stream(newStream);
         (,,,,,, address payer,,) = s.stream();
@@ -99,14 +100,18 @@ contract StreamFactoryTest is Test {
     function test_createStream_differentSenderCantFrontrunToFailCreation() public {
         uint256 startTime = 1640988000;
         uint256 stopTime = 1672524000;
-        uint256 deposit = 999975024000;
+        uint256 tokenAmount = 999975024000;
         address honestSender = address(0x4242);
         address frontrunner = address(0x1234);
 
         vm.prank(frontrunner);
-        factory.createStream(honestSender, recipient, deposit, address(token), startTime, stopTime);
+        factory.createStream(
+            honestSender, recipient, tokenAmount, address(token), startTime, stopTime
+        );
 
         vm.prank(honestSender);
-        factory.createStream(honestSender, recipient, deposit, address(token), startTime, stopTime);
+        factory.createStream(
+            honestSender, recipient, tokenAmount, address(token), startTime, stopTime
+        );
     }
 }
