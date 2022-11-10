@@ -6,6 +6,7 @@ import { Initializable } from "openzeppelin-contracts/proxy/utils/Initializable.
 import { ReentrancyGuard } from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 import { IStream } from "./IStream.sol";
 
 contract Stream is IStream, Initializable, ReentrancyGuard {
@@ -103,11 +104,13 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         address payer = stream.payer;
         address recipient = stream.recipient;
 
-        uint256 payerBalance = balanceOf(payer);
+        uint256 payerBalance = Math.min(balanceOf(payer), tokenBalance());
         uint256 recipientBalance = balanceOf(recipient);
 
         IERC20 token = IERC20(stream.tokenAddress);
-        if (payerBalance > 0) token.safeTransfer(payer, payerBalance);
+        if (payerBalance > 0) {
+            token.safeTransfer(payer, payerBalance);
+        }
         if (recipientBalance > 0) token.safeTransfer(recipient, recipientBalance);
 
         emit StreamCancelled(payer, recipient, payerBalance, recipientBalance);
@@ -143,5 +146,9 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         if (block.timestamp <= stream.startTime) return 0;
         if (block.timestamp < stream.stopTime) return block.timestamp - stream.startTime;
         return stream.stopTime - stream.startTime;
+    }
+
+    function tokenBalance() internal view returns (uint256) {
+        return IERC20(stream.tokenAddress).balanceOf(address(this));
     }
 }

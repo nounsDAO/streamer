@@ -383,4 +383,19 @@ contract StreamCancelTest is StreamTest {
         assertEq(token.balanceOf(payer), expectedPayerBalance);
         assertEq(token.balanceOf(recipient), expectedRecipientBalance);
     }
+
+    function test_cancel_returnsOnlyTokenBalanceToPayerIfNotFullyFunded() public {
+        uint256 fundedAmount = STREAM_AMOUNT - 1;
+        token.mint(address(s), fundedAmount);
+        assertEq(token.balanceOf(payer), 0);
+        assertEq(token.balanceOf(recipient), 0);
+
+        vm.expectEmit(true, true, true, true);
+        emit StreamCancelled(payer, recipient, fundedAmount, 0);
+        vm.prank(payer);
+        s.cancel();
+
+        assertEq(token.balanceOf(payer), fundedAmount);
+        assertEq(token.balanceOf(recipient), 0);
+    }
 }
