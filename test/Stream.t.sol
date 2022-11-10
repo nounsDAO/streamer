@@ -196,6 +196,21 @@ contract StreamWithdrawTest is StreamTest {
         vm.prank(payer);
         s.withdraw(amount);
     }
+
+    function test_withdraw_takesPreviousWithdrawalsIntoAccount() public {
+        token.mint(address(s), STREAM_AMOUNT);
+        vm.startPrank(recipient);
+
+        vm.warp(startTime + (DURATION / 10));
+        s.withdraw(STREAM_AMOUNT / 10);
+        uint256 withdrawnAmount = STREAM_AMOUNT / 10;
+
+        vm.warp(startTime + (DURATION / 2));
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        s.withdraw(STREAM_AMOUNT / 2);
+
+        s.withdraw((STREAM_AMOUNT / 2) - withdrawnAmount);
+    }
 }
 
 contract StreamBalanceOfTest is StreamTest {
