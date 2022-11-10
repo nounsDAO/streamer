@@ -81,14 +81,15 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
 
     function withdraw(uint256 amount) external nonReentrant onlySenderOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
+        address recipient = stream.recipient;
 
-        uint256 balance = balanceOf(stream.recipient);
+        uint256 balance = balanceOf(recipient);
         if (balance < amount) revert AmountExceedsBalance();
 
         stream.remainingBalance = stream.remainingBalance - amount;
 
-        IERC20(stream.tokenAddress).safeTransfer(stream.recipient, amount);
-        emit TokensWithdrawn(stream.recipient, amount);
+        IERC20(stream.tokenAddress).safeTransfer(recipient, amount);
+        emit TokensWithdrawn(recipient, amount);
     }
 
     /**
