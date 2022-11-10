@@ -148,6 +148,14 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         return stream.stopTime - stream.startTime;
     }
 
+    /**
+     * @notice Get this stream's token balance vs the token amount required to meet the commitment
+     * to recipient.
+     */
+    function tokenAndOutstandingBalance() public view returns (uint256, uint256) {
+        return (tokenBalance(), stream.remainingBalance);
+    }
+
     function tokenBalance() internal view returns (uint256) {
         return IERC20(stream.tokenAddress).balanceOf(address(this));
     }

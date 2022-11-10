@@ -217,6 +217,8 @@ contract StreamWithdrawTest is StreamTest {
         s.withdraw(STREAM_AMOUNT / 2);
 
         s.withdraw((STREAM_AMOUNT / 2) - withdrawnAmount);
+
+        vm.stopPrank();
     }
 }
 
@@ -397,5 +399,49 @@ contract StreamCancelTest is StreamTest {
 
         assertEq(token.balanceOf(payer), fundedAmount);
         assertEq(token.balanceOf(recipient), 0);
+    }
+}
+
+contract StreamTokenAndOutstandingBalanceTest is StreamTest {
+    function setUp() public override {
+        super.setUp();
+
+        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
+    }
+
+    function test_tokenAndOutstandingBalance_tokenBalanceWorks() public {
+        (uint256 tokenBalance,) = s.tokenAndOutstandingBalance();
+        assertEq(tokenBalance, 0);
+
+        token.mint(address(s), 111);
+        (tokenBalance,) = s.tokenAndOutstandingBalance();
+        assertEq(tokenBalance, 111);
+
+        token.mint(address(s), 111);
+        (tokenBalance,) = s.tokenAndOutstandingBalance();
+        assertEq(tokenBalance, 222);
+
+        token.burn(address(s), 222);
+        (tokenBalance,) = s.tokenAndOutstandingBalance();
+        assertEq(tokenBalance, 0);
+    }
+
+    function test_tokenAndOutstandingBalance_remainingBalanceWorks() public {
+        token.mint(address(s), STREAM_AMOUNT);
+        (, uint256 remainingBalance) = s.tokenAndOutstandingBalance();
+        assertEq(remainingBalance, STREAM_AMOUNT);
+        vm.warp(stopTime);
+
+        vm.startPrank(recipient);
+
+        s.withdraw(STREAM_AMOUNT / 2);
+        (, remainingBalance) = s.tokenAndOutstandingBalance();
+        assertEq(remainingBalance, STREAM_AMOUNT / 2);
+
+        s.withdraw(STREAM_AMOUNT / 2);
+        (, remainingBalance) = s.tokenAndOutstandingBalance();
+        assertEq(remainingBalance, 0);
+
+        vm.stopPrank();
     }
 }
