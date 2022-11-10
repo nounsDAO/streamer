@@ -197,3 +197,75 @@ contract StreamWithdrawTest is StreamTest {
         s.withdraw(amount);
     }
 }
+
+contract StreamBalanceOfTest is StreamTest {
+    function setUp() public override {
+        super.setUp();
+
+        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
+    }
+
+    function test_balanceOf_zeroBeforeStreamStarts() public {
+        assertEq(s.balanceOf(recipient), 0);
+    }
+
+    function test_balanceOf_zeroForNonPayerOrRecipient() public {
+        vm.warp(stopTime);
+        assertEq(s.balanceOf(address(0x4242)), 0);
+    }
+
+    function test_balanceOf_recipientBalanceIncreasesLinearlyWithTime() public {
+        vm.warp(startTime + (DURATION / 10));
+        assertEq(s.balanceOf(recipient), STREAM_AMOUNT / 10);
+
+        vm.warp(startTime + (DURATION / 5));
+        assertEq(s.balanceOf(recipient), STREAM_AMOUNT / 5);
+
+        vm.warp(startTime + (DURATION / 2));
+        assertEq(s.balanceOf(recipient), STREAM_AMOUNT / 2);
+
+        vm.warp(stopTime);
+        assertEq(s.balanceOf(recipient), STREAM_AMOUNT);
+    }
+
+    function test_balanceOf_payerBalanceDecreasesLinearlyWithTime() public {
+        vm.warp(startTime + (DURATION / 10));
+        assertEq(s.balanceOf(payer), STREAM_AMOUNT - (STREAM_AMOUNT / 10));
+
+        vm.warp(startTime + (DURATION / 5));
+        assertEq(s.balanceOf(payer), STREAM_AMOUNT - (STREAM_AMOUNT / 5));
+
+        vm.warp(startTime + (DURATION / 2));
+        assertEq(s.balanceOf(payer), STREAM_AMOUNT / 2);
+
+        vm.warp(stopTime);
+        assertEq(s.balanceOf(payer), 0);
+    }
+
+    function test_balanceOf_takesWithdrawalsIntoAccount() public {
+        token.mint(address(s), STREAM_AMOUNT);
+        uint256 withdrawnAmount = 0;
+
+        vm.warp(startTime + (DURATION / 10));
+        uint256 expectedBalance = STREAM_AMOUNT / 10;
+        assertEq(s.balanceOf(recipient), expectedBalance);
+
+        vm.prank(recipient);
+        s.withdraw(expectedBalance);
+        assertEq(s.balanceOf(recipient), 0);
+        withdrawnAmount += expectedBalance;
+
+        vm.warp(startTime + (DURATION / 5));
+        expectedBalance = (STREAM_AMOUNT / 5) - withdrawnAmount;
+        assertEq(s.balanceOf(recipient), expectedBalance);
+
+        vm.prank(recipient);
+        s.withdraw(expectedBalance - 1);
+        assertEq(s.balanceOf(recipient), 1);
+        withdrawnAmount += expectedBalance - 1;
+
+        vm.warp(startTime + (DURATION / 2));
+        expectedBalance = (STREAM_AMOUNT / 2) - withdrawnAmount;
+        assertEq(s.balanceOf(recipient), expectedBalance);
+    }
+}

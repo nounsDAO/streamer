@@ -94,59 +94,32 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
     }
 
     /**
-     * @notice Returns the available funds for the given stream id and address.
-     * @dev Throws if the id does not point to a valid stream.
+     * @notice Returns the available funds to withdraw
      * @param who The address for which to query the balance.
      * @return balance The total funds allocated to `who` as uint256.
      */
     function balanceOf(address who) public view returns (uint256 balance) {
-        // Types.Stream memory stream = streams[streamId];
-        BalanceOfLocalVars memory vars;
+        uint256 streamTokenAmount = stream.tokenAmount;
+        uint256 streamRemainingBalance = stream.remainingBalance;
+        uint256 recipientBalance = elapsedTime() * stream.ratePerSecond;
 
-        uint256 delta = deltaOf();
-        (vars.mathErr, vars.recipientBalance) = mulUInt(delta, stream.ratePerSecond);
-        require(vars.mathErr == MathError.NO_ERROR, "recipient balance calculation error");
-
-        /*
-         * If the stream `balance` does not equal `tokenAmount`, it means there have been withdrawals.
-         * We have to subtract the total amount withdrawn from the amount of money that has been
-         * streamed until now.
-         */
-        if (stream.tokenAmount > stream.remainingBalance) {
-            (vars.mathErr, vars.withdrawalAmount) =
-                subUInt(stream.tokenAmount, stream.remainingBalance);
-            assert(vars.mathErr == MathError.NO_ERROR);
-            (vars.mathErr, vars.recipientBalance) =
-                subUInt(vars.recipientBalance, vars.withdrawalAmount);
-            /* `withdrawalAmount` cannot and should not be bigger than `recipientBalance`. */
-            assert(vars.mathErr == MathError.NO_ERROR);
+        // Take withdrawals into account
+        if (streamTokenAmount > streamRemainingBalance) {
+            uint256 withdrawalAmount = streamTokenAmount - streamRemainingBalance;
+            recipientBalance -= withdrawalAmount;
         }
 
-        if (who == stream.recipient) return vars.recipientBalance;
+        if (who == stream.recipient) return recipientBalance;
         if (who == stream.payer) {
-            (vars.mathErr, vars.senderBalance) =
-                subUInt(stream.remainingBalance, vars.recipientBalance);
-            /* `recipientBalance` cannot and should not be bigger than `remainingBalance`. */
-            assert(vars.mathErr == MathError.NO_ERROR);
-            return vars.senderBalance;
+            return streamRemainingBalance - recipientBalance;
         }
         return 0;
     }
 
-    struct BalanceOfLocalVars {
-        MathError mathErr;
-        uint256 recipientBalance;
-        uint256 withdrawalAmount;
-        uint256 senderBalance;
-    }
-
     /**
-     * @notice Returns either the delta in seconds between `block.timestamp` and `startTime` or
-     *  between `stopTime` and `startTime, whichever is smaller. If `block.timestamp` is before
-     *  `startTime`, it returns 0.
-     * @return delta The time delta in seconds.
+     * @notice Returns the time elapsed in this stream, or zero if it hasn't started yet.
      */
-    function deltaOf() public view returns (uint256 delta) {
+    function elapsedTime() public view returns (uint256) {
         if (block.timestamp <= stream.startTime) return 0;
         if (block.timestamp < stream.stopTime) return block.timestamp - stream.startTime;
         return stream.stopTime - stream.startTime;
