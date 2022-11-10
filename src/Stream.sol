@@ -13,7 +13,9 @@ import { IStream } from "./IStream.sol";
 contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
     using SafeERC20 for IERC20;
 
-    Types.Stream public stream;
+    error PayerIsAddressZero();
+    error RecipientIsAddressZero();
+    error RecipientIsStreamContract();
 
     event CreateStream(
         address indexed sender,
@@ -26,6 +28,8 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
 
     event WithdrawFromStream(address indexed recipient, uint256 amount);
 
+    Types.Stream public stream;
+
     function initialize(
         address payer,
         address recipient,
@@ -34,8 +38,9 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
         uint256 startTime,
         uint256 stopTime
     ) public initializer {
-        require(recipient != address(0x00), "stream to the zero address");
-        require(recipient != address(this), "stream to the contract itself");
+        if (payer == address(0)) revert PayerIsAddressZero();
+        if (recipient == address(0)) revert RecipientIsAddressZero();
+        if (recipient == address(this)) revert RecipientIsStreamContract();
         require(recipient != msg.sender, "stream to the caller");
         require(deposit > 0, "deposit is zero");
         require(startTime >= block.timestamp, "start time before block.timestamp");
