@@ -100,24 +100,14 @@ contract StreamInitializeTest is StreamTest {
 
         s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
 
-        (
-            uint256 tokenAmount,
-            uint256 remainingBalance,
-            uint256 ratePerSecond,
-            uint256 actualStartTime,
-            uint256 actualStopTime,
-            address actualRecipient,
-            address actualPayer,
-            address tokenAddress
-        ) = s.stream();
-        assertEq(tokenAmount, STREAM_AMOUNT);
-        assertEq(remainingBalance, STREAM_AMOUNT);
-        assertEq(ratePerSecond, 2);
-        assertEq(actualStartTime, startTime);
-        assertEq(actualStopTime, stopTime);
-        assertEq(actualRecipient, recipient);
-        assertEq(actualPayer, payer);
-        assertEq(tokenAddress, address(token));
+        assertEq(s.tokenAmount(), STREAM_AMOUNT);
+        assertEq(s.remainingBalance(), STREAM_AMOUNT);
+        assertEq(s.ratePerSecond(), 2);
+        assertEq(s.startTime(), startTime);
+        assertEq(s.stopTime(), stopTime);
+        assertEq(s.recipient(), recipient);
+        assertEq(s.payer(), payer);
+        assertEq(s.tokenAddress(), address(token));
     }
 }
 
@@ -188,8 +178,7 @@ contract StreamWithdrawTest is StreamTest {
         vm.prank(recipient);
         s.withdraw(amount);
 
-        (, uint256 remainingBalance,,,,,,) = s.stream();
-        assertEq(remainingBalance, STREAM_AMOUNT - amount);
+        assertEq(s.remainingBalance(), STREAM_AMOUNT - amount);
     }
 
     function test_withdraw_payerCanWithdrawForRecipient() public {

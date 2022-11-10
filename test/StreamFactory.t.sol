@@ -66,7 +66,7 @@ contract StreamFactoryTest is Test {
         );
 
         // Proposal would do these txs
-        IStream(factory.createStream(recipient, tokenAmount, address(token), startTime, stopTime));
+        factory.createStream(recipient, tokenAmount, address(token), startTime, stopTime);
         token.mint(predictedAddress, tokenAmount);
         // End proposal
 
@@ -95,9 +95,7 @@ contract StreamFactoryTest is Test {
             factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
 
         Stream s = Stream(newStream);
-        (,,,,,, address actualPayer,) = s.stream();
-
-        assertEq(actualPayer, payer);
+        assertEq(s.payer(), payer);
     }
 
     function test_createStream_defaultPayerIsMsgSender() public {
@@ -109,9 +107,7 @@ contract StreamFactoryTest is Test {
             factory.createStream(recipient, tokenAmount, address(token), startTime, stopTime);
 
         Stream s = Stream(newStream);
-        (,,,,,, address payer,) = s.stream();
-
-        assertEq(payer, address(this));
+        assertEq(s.payer(), address(this));
     }
 
     function test_createStream_differentSenderCantFrontrunToFailCreation() public {

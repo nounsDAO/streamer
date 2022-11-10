@@ -41,13 +41,20 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         uint256 recipientBalance
     );
 
-    StreamState public stream;
+    uint256 public tokenAmount;
+    uint256 public remainingBalance;
+    uint256 public ratePerSecond;
+    uint256 public startTime;
+    uint256 public stopTime;
+    address public recipient;
+    address public payer;
+    address public tokenAddress;
 
     /**
      * @dev Throws if the caller is not the sender of the recipient of the stream.
      */
     modifier onlyPayerOrRecipient() {
-        if (msg.sender != stream.recipient && msg.sender != stream.payer) {
+        if (msg.sender != recipient && msg.sender != payer) {
             revert CallerNotPayerOrRecipient();
         }
 
@@ -55,65 +62,63 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
     }
 
     function initialize(
-        address payer,
-        address recipient,
-        uint256 tokenAmount,
-        address tokenAddress,
-        uint256 startTime,
-        uint256 stopTime
+        address _payer,
+        address _recipient,
+        uint256 _tokenAmount,
+        address _tokenAddress,
+        uint256 _startTime,
+        uint256 _stopTime
     ) public initializer {
-        if (payer == address(0)) revert PayerIsAddressZero();
-        if (recipient == address(0)) revert RecipientIsAddressZero();
-        if (recipient == address(this)) revert RecipientIsStreamContract();
-        if (tokenAmount == 0) revert TokenAmountIsZero();
-        if (stopTime <= startTime) revert DurationMustBePositive();
+        if (_payer == address(0)) revert PayerIsAddressZero();
+        if (_recipient == address(0)) revert RecipientIsAddressZero();
+        if (_recipient == address(this)) revert RecipientIsStreamContract();
+        if (_tokenAmount == 0) revert TokenAmountIsZero();
+        if (_stopTime <= _startTime) revert DurationMustBePositive();
 
-        uint256 duration = stopTime - startTime;
+        uint256 duration = _stopTime - _startTime;
 
-        if (tokenAmount < duration) revert TokenAmountLessThanDuration();
-        if (tokenAmount % duration != 0) revert TokenAmountNotMultipleOfDuration();
+        if (_tokenAmount < duration) revert TokenAmountLessThanDuration();
+        if (_tokenAmount % duration != 0) revert TokenAmountNotMultipleOfDuration();
 
-        stream = StreamState({
-            remainingBalance: tokenAmount,
-            tokenAmount: tokenAmount,
-            ratePerSecond: tokenAmount / duration,
-            recipient: recipient,
-            payer: payer,
-            startTime: startTime,
-            stopTime: stopTime,
-            tokenAddress: tokenAddress
-        });
+        remainingBalance = _tokenAmount;
+        tokenAmount = _tokenAmount;
+        ratePerSecond = _tokenAmount / duration;
+        recipient = _recipient;
+        payer = _payer;
+        startTime = _startTime;
+        stopTime = _stopTime;
+        tokenAddress = _tokenAddress;
 
         emit StreamCreated(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
     }
 
     function withdraw(uint256 amount) external nonReentrant onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
-        address recipient = stream.recipient;
+        address recipient_ = recipient;
 
-        uint256 balance = balanceOf(recipient);
+        uint256 balance = balanceOf(recipient_);
         if (balance < amount) revert AmountExceedsBalance();
 
-        stream.remainingBalance = stream.remainingBalance - amount;
+        remainingBalance = remainingBalance - amount;
 
-        IERC20(stream.tokenAddress).safeTransfer(recipient, amount);
-        emit TokensWithdrawn(recipient, amount);
+        IERC20(tokenAddress).safeTransfer(recipient_, amount);
+        emit TokensWithdrawn(recipient_, amount);
     }
 
     function cancel() external nonReentrant onlyPayerOrRecipient {
-        address payer = stream.payer;
-        address recipient = stream.recipient;
+        address payer_ = payer;
+        address recipient_ = recipient;
 
-        uint256 payerBalance = Math.min(balanceOf(payer), tokenBalance());
-        uint256 recipientBalance = balanceOf(recipient);
+        uint256 payerBalance = Math.min(balanceOf(payer_), tokenBalance());
+        uint256 recipientBalance = balanceOf(recipient_);
 
-        IERC20 token = IERC20(stream.tokenAddress);
+        IERC20 token = IERC20(tokenAddress);
         if (payerBalance > 0) {
-            token.safeTransfer(payer, payerBalance);
+            token.safeTransfer(payer_, payerBalance);
         }
-        if (recipientBalance > 0) token.safeTransfer(recipient, recipientBalance);
+        if (recipientBalance > 0) token.safeTransfer(recipient_, recipientBalance);
 
-        emit StreamCancelled(payer, recipient, payerBalance, recipientBalance);
+        emit StreamCancelled(payer_, recipient_, payerBalance, recipientBalance);
     }
 
     /**
@@ -122,19 +127,19 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      * @return balance The total funds allocated to `who` as uint256.
      */
     function balanceOf(address who) public view returns (uint256 balance) {
-        uint256 streamTokenAmount = stream.tokenAmount;
-        uint256 streamRemainingBalance = stream.remainingBalance;
-        uint256 recipientBalance = elapsedTime() * stream.ratePerSecond;
+        uint256 tokenAmount_ = tokenAmount;
+        uint256 remainingBalance_ = remainingBalance;
+        uint256 recipientBalance = elapsedTime() * ratePerSecond;
 
         // Take withdrawals into account
-        if (streamTokenAmount > streamRemainingBalance) {
-            uint256 withdrawalAmount = streamTokenAmount - streamRemainingBalance;
+        if (tokenAmount_ > remainingBalance_) {
+            uint256 withdrawalAmount = tokenAmount_ - remainingBalance_;
             recipientBalance -= withdrawalAmount;
         }
 
-        if (who == stream.recipient) return recipientBalance;
-        if (who == stream.payer) {
-            return streamRemainingBalance - recipientBalance;
+        if (who == recipient) return recipientBalance;
+        if (who == payer) {
+            return remainingBalance_ - recipientBalance;
         }
         return 0;
     }
@@ -143,9 +148,9 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      * @notice Returns the time elapsed in this stream, or zero if it hasn't started yet.
      */
     function elapsedTime() public view returns (uint256) {
-        if (block.timestamp <= stream.startTime) return 0;
-        if (block.timestamp < stream.stopTime) return block.timestamp - stream.startTime;
-        return stream.stopTime - stream.startTime;
+        if (block.timestamp <= startTime) return 0;
+        if (block.timestamp < stopTime) return block.timestamp - startTime;
+        return stopTime - startTime;
     }
 
     /**
@@ -153,10 +158,10 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      * to recipient.
      */
     function tokenAndOutstandingBalance() public view returns (uint256, uint256) {
-        return (tokenBalance(), stream.remainingBalance);
+        return (tokenBalance(), remainingBalance);
     }
 
     function tokenBalance() internal view returns (uint256) {
-        return IERC20(stream.tokenAddress).balanceOf(address(this));
+        return IERC20(tokenAddress).balanceOf(address(this));
     }
 }
