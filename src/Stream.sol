@@ -6,7 +6,6 @@ import { Initializable } from "openzeppelin-contracts/proxy/utils/Initializable.
 import { ReentrancyGuard } from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import { Types } from "./Types.sol";
 import { CarefulMath } from "./CarefulMath.sol";
 import { IStream } from "./IStream.sol";
 
@@ -35,7 +34,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
 
     event TokensWithdrawn(address indexed recipient, uint256 amount);
 
-    Types.Stream public stream;
+    StreamState public stream;
 
     /**
      * @dev Throws if the caller is not the sender of the recipient of the stream.
@@ -67,7 +66,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
         if (tokenAmount < duration) revert TokenAmountLessThanDuration();
         if (tokenAmount % duration != 0) revert TokenAmountNotMultipleOfDuration();
 
-        stream = Types.Stream({
+        stream = StreamState({
             remainingBalance: tokenAmount,
             tokenAmount: tokenAmount,
             ratePerSecond: tokenAmount / duration,
