@@ -16,11 +16,13 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
     error PayerIsAddressZero();
     error RecipientIsAddressZero();
     error RecipientIsStreamContract();
+    error TokenAmountIsZero();
+    error DurationMustBePositive();
 
     event CreateStream(
         address indexed sender,
         address indexed recipient,
-        uint256 deposit,
+        uint256 tokenAmount,
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
@@ -33,7 +35,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
     function initialize(
         address payer,
         address recipient,
-        uint256 deposit,
+        uint256 tokenAmount,
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
@@ -41,8 +43,8 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
         if (payer == address(0)) revert PayerIsAddressZero();
         if (recipient == address(0)) revert RecipientIsAddressZero();
         if (recipient == address(this)) revert RecipientIsStreamContract();
-        require(deposit > 0, "deposit is zero");
-        require(stopTime > startTime, "stop time before the start time");
+        if (tokenAmount == 0) revert TokenAmountIsZero();
+        if (stopTime <= startTime) revert DurationMustBePositive();
 
         CreateStreamLocalVars memory vars;
         (vars.mathErr, vars.duration) = subUInt(stopTime, startTime);
@@ -50,19 +52,19 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
         assert(vars.mathErr == MathError.NO_ERROR);
 
         /* Without this, the rate per second would be zero. */
-        require(deposit >= vars.duration, "deposit smaller than time delta");
+        require(tokenAmount >= vars.duration, "tokenAmount smaller than time delta");
 
         /* This condition avoids dealing with remainders */
-        require(deposit % vars.duration == 0, "deposit not multiple of time delta");
+        require(tokenAmount % vars.duration == 0, "tokenAmount not multiple of time delta");
 
-        (vars.mathErr, vars.ratePerSecond) = divUInt(deposit, vars.duration);
+        (vars.mathErr, vars.ratePerSecond) = divUInt(tokenAmount, vars.duration);
         /* `divUInt` can only return MathError.DIVISION_BY_ZERO but we know `duration` is not zero. */
         assert(vars.mathErr == MathError.NO_ERROR);
 
         /* Create and store the stream object. */
         stream = Types.Stream({
-            remainingBalance: deposit,
-            deposit: deposit,
+            remainingBalance: tokenAmount,
+            tokenAmount: tokenAmount,
             isEntity: true,
             ratePerSecond: vars.ratePerSecond,
             recipient: recipient,
@@ -72,7 +74,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
             tokenAddress: tokenAddress
         });
 
-        emit CreateStream(payer, recipient, deposit, tokenAddress, startTime, stopTime);
+        emit CreateStream(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
     }
 
     struct CreateStreamLocalVars {
@@ -133,12 +135,13 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
         require(vars.mathErr == MathError.NO_ERROR, "recipient balance calculation error");
 
         /*
-         * If the stream `balance` does not equal `deposit`, it means there have been withdrawals.
+         * If the stream `balance` does not equal `tokenAmount`, it means there have been withdrawals.
          * We have to subtract the total amount withdrawn from the amount of money that has been
          * streamed until now.
          */
-        if (stream.deposit > stream.remainingBalance) {
-            (vars.mathErr, vars.withdrawalAmount) = subUInt(stream.deposit, stream.remainingBalance);
+        if (stream.tokenAmount > stream.remainingBalance) {
+            (vars.mathErr, vars.withdrawalAmount) =
+                subUInt(stream.tokenAmount, stream.remainingBalance);
             assert(vars.mathErr == MathError.NO_ERROR);
             (vars.mathErr, vars.recipientBalance) =
                 subUInt(vars.recipientBalance, vars.withdrawalAmount);

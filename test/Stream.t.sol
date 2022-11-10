@@ -58,4 +58,18 @@ contract StreamTest is Test {
             address(0x11), address(s), 1000, address(token), block.timestamp, block.timestamp + 1000
         );
     }
+
+    function test_initialize_revertsWhenTokenAmountIsZero() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.TokenAmountIsZero.selector));
+        s.initialize(
+            address(0x11), address(0x22), 0, address(token), block.timestamp, block.timestamp + 1000
+        );
+    }
+
+    function test_initialize_revertsWhenDurationIsNotPositive() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.DurationMustBePositive.selector));
+        s.initialize(
+            address(0x11), address(0x22), 1000, address(token), block.timestamp, block.timestamp
+        );
+    }
 }

@@ -8,7 +8,7 @@ pragma solidity ^0.8.17;
  */
 library Types {
     struct Stream {
-        uint256 deposit;
+        uint256 tokenAmount;
         uint256 ratePerSecond;
         uint256 remainingBalance;
         uint256 startTime;
