@@ -41,9 +41,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
         if (payer == address(0)) revert PayerIsAddressZero();
         if (recipient == address(0)) revert RecipientIsAddressZero();
         if (recipient == address(this)) revert RecipientIsStreamContract();
-        require(recipient != msg.sender, "stream to the caller");
         require(deposit > 0, "deposit is zero");
-        require(startTime >= block.timestamp, "start time before block.timestamp");
         require(stopTime > startTime, "stop time before the start time");
 
         CreateStreamLocalVars memory vars;
