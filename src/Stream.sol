@@ -186,9 +186,9 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
     /**
      * @notice Returns the available funds to withdraw.
      * @param who The address for which to query the balance.
-     * @return balance The total funds allocated to `who` as uint256.
+     * @return uint256 The total funds allocated to `who` as uint256.
      */
-    function balanceOf(address who) public view returns (uint256 balance) {
+    function balanceOf(address who) public view returns (uint256) {
         uint256 tokenAmount_ = tokenAmount;
         uint256 remainingBalance_ = remainingBalance;
         uint256 recipientBalance = elapsedTime() * ratePerSecond;
