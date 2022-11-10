@@ -6,10 +6,9 @@ import { Initializable } from "openzeppelin-contracts/proxy/utils/Initializable.
 import { ReentrancyGuard } from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import { CarefulMath } from "./CarefulMath.sol";
 import { IStream } from "./IStream.sol";
 
-contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
+contract Stream is IStream, Initializable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     error PayerIsAddressZero();
