@@ -164,15 +164,15 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
     function cancel() external nonReentrant onlyPayerOrRecipient {
         address payer_ = payer;
         address recipient_ = recipient;
-
-        uint256 payerBalance = Math.min(balanceOf(payer_), tokenBalance());
-        uint256 recipientBalance = balanceOf(recipient_);
-
         IERC20 token = IERC20(tokenAddress);
+
+        uint256 recipientBalance = balanceOf(recipient_);
+        if (recipientBalance > 0) token.safeTransfer(recipient_, recipientBalance);
+
+        uint256 payerBalance = tokenBalance();
         if (payerBalance > 0) {
             token.safeTransfer(payer_, payerBalance);
         }
-        if (recipientBalance > 0) token.safeTransfer(recipient_, recipientBalance);
 
         emit StreamCancelled(payer_, recipient_, payerBalance, recipientBalance);
     }
