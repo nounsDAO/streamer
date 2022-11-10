@@ -9,6 +9,15 @@ import { Stream } from "../src/Stream.sol";
 import { IStream } from "../src/IStream.sol";
 
 contract StreamTest is Test {
+    event CreateStream(
+        address indexed payer,
+        address indexed recipient,
+        uint256 tokenAmount,
+        address tokenAddress,
+        uint256 startTime,
+        uint256 stopTime
+    );
+
     ERC20Mock token;
     Stream s;
 
@@ -71,5 +80,69 @@ contract StreamTest is Test {
         s.initialize(
             address(0x11), address(0x22), 1000, address(token), block.timestamp, block.timestamp
         );
+    }
+
+    function test_initialize_revertsWhenAmountLessThanDuration() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.TokenAmountLessThanDuration.selector));
+        s.initialize(
+            address(0x11),
+            address(0x22),
+            999,
+            address(token),
+            block.timestamp,
+            block.timestamp + 1000
+        );
+    }
+
+    function test_initialize_revertsWhenAmountModDurationNotZero() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.TokenAmountNotMultipleOfDuration.selector));
+        s.initialize(
+            address(0x11),
+            address(0x22),
+            1001,
+            address(token),
+            block.timestamp,
+            block.timestamp + 1000
+        );
+    }
+
+    function test_initialize_savesStreamAndEmitsEvent() public {
+        vm.expectEmit(true, true, true, true);
+        emit CreateStream(
+            address(0x11),
+            address(0x22),
+            2000,
+            address(token),
+            block.timestamp,
+            block.timestamp + 1000
+            );
+
+        s.initialize(
+            address(0x11),
+            address(0x22),
+            2000,
+            address(token),
+            block.timestamp,
+            block.timestamp + 1000
+        );
+
+        (
+            uint256 tokenAmount,
+            uint256 remainingBalance,
+            uint256 ratePerSecond,
+            uint256 startTime,
+            uint256 stopTime,
+            address recipient,
+            address payer,
+            address tokenAddress
+        ) = s.stream();
+        assertEq(tokenAmount, 2000);
+        assertEq(remainingBalance, 2000);
+        assertEq(ratePerSecond, 2);
+        assertEq(startTime, block.timestamp);
+        assertEq(stopTime, block.timestamp + 1000);
+        assertEq(recipient, address(0x22));
+        assertEq(payer, address(0x11));
+        assertEq(tokenAddress, address(token));
     }
 }

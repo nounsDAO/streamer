@@ -18,9 +18,11 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
     error RecipientIsStreamContract();
     error TokenAmountIsZero();
     error DurationMustBePositive();
+    error TokenAmountLessThanDuration();
+    error TokenAmountNotMultipleOfDuration();
 
     event CreateStream(
-        address indexed sender,
+        address indexed payer,
         address indexed recipient,
         uint256 tokenAmount,
         address tokenAddress,
@@ -46,27 +48,15 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
         if (tokenAmount == 0) revert TokenAmountIsZero();
         if (stopTime <= startTime) revert DurationMustBePositive();
 
-        CreateStreamLocalVars memory vars;
-        (vars.mathErr, vars.duration) = subUInt(stopTime, startTime);
-        /* `subUInt` can only return MathError.INTEGER_UNDERFLOW but we know `stopTime` is higher than `startTime`. */
-        assert(vars.mathErr == MathError.NO_ERROR);
+        uint256 duration = stopTime - startTime;
 
-        /* Without this, the rate per second would be zero. */
-        require(tokenAmount >= vars.duration, "tokenAmount smaller than time delta");
+        if (tokenAmount < duration) revert TokenAmountLessThanDuration();
+        if (tokenAmount % duration != 0) revert TokenAmountNotMultipleOfDuration();
 
-        /* This condition avoids dealing with remainders */
-        require(tokenAmount % vars.duration == 0, "tokenAmount not multiple of time delta");
-
-        (vars.mathErr, vars.ratePerSecond) = divUInt(tokenAmount, vars.duration);
-        /* `divUInt` can only return MathError.DIVISION_BY_ZERO but we know `duration` is not zero. */
-        assert(vars.mathErr == MathError.NO_ERROR);
-
-        /* Create and store the stream object. */
         stream = Types.Stream({
             remainingBalance: tokenAmount,
             tokenAmount: tokenAmount,
-            isEntity: true,
-            ratePerSecond: vars.ratePerSecond,
+            ratePerSecond: tokenAmount / duration,
             recipient: recipient,
             payer: payer,
             startTime: startTime,
@@ -75,12 +65,6 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
         });
 
         emit CreateStream(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
-    }
-
-    struct CreateStreamLocalVars {
-        MathError mathErr;
-        uint256 duration;
-        uint256 ratePerSecond;
     }
 
     /**

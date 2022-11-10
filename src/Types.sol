@@ -9,13 +9,12 @@ pragma solidity ^0.8.17;
 library Types {
     struct Stream {
         uint256 tokenAmount;
-        uint256 ratePerSecond;
         uint256 remainingBalance;
+        uint256 ratePerSecond;
         uint256 startTime;
         uint256 stopTime;
         address recipient;
         address payer;
         address tokenAddress;
-        bool isEntity;
     }
 }

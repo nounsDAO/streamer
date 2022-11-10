@@ -95,7 +95,7 @@ contract StreamFactoryTest is Test {
             factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
 
         Stream s = Stream(newStream);
-        (,,,,,, address actualPayer,,) = s.stream();
+        (,,,,,, address actualPayer,) = s.stream();
 
         assertEq(actualPayer, payer);
     }
@@ -109,7 +109,7 @@ contract StreamFactoryTest is Test {
             factory.createStream(recipient, tokenAmount, address(token), startTime, stopTime);
 
         Stream s = Stream(newStream);
-        (,,,,,, address payer,,) = s.stream();
+        (,,,,,, address payer,) = s.stream();
 
         assertEq(payer, address(this));
     }
