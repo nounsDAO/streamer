@@ -33,12 +33,19 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
 
     event TokensWithdrawn(address indexed recipient, uint256 amount);
 
+    event StreamCancelled(
+        address indexed payer,
+        address indexed recipient,
+        uint256 payerBalance,
+        uint256 recipientBalance
+    );
+
     StreamState public stream;
 
     /**
      * @dev Throws if the caller is not the sender of the recipient of the stream.
      */
-    modifier onlySenderOrRecipient() {
+    modifier onlyPayerOrRecipient() {
         if (msg.sender != stream.recipient && msg.sender != stream.payer) {
             revert CallerNotPayerOrRecipient();
         }
@@ -79,7 +86,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         emit StreamCreated(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
     }
 
-    function withdraw(uint256 amount) external nonReentrant onlySenderOrRecipient {
+    function withdraw(uint256 amount) external nonReentrant onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
         address recipient = stream.recipient;
 
@@ -90,6 +97,20 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
 
         IERC20(stream.tokenAddress).safeTransfer(recipient, amount);
         emit TokensWithdrawn(recipient, amount);
+    }
+
+    function cancel() external nonReentrant onlyPayerOrRecipient {
+        address payer = stream.payer;
+        address recipient = stream.recipient;
+
+        uint256 payerBalance = balanceOf(payer);
+        uint256 recipientBalance = balanceOf(recipient);
+
+        IERC20 token = IERC20(stream.tokenAddress);
+        if (payerBalance > 0) token.safeTransfer(payer, payerBalance);
+        if (recipientBalance > 0) token.safeTransfer(recipient, recipientBalance);
+
+        emit StreamCancelled(payer, recipient, payerBalance, recipientBalance);
     }
 
     /**
