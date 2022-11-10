@@ -9,7 +9,7 @@ import { Stream } from "../src/Stream.sol";
 import { IStream } from "../src/IStream.sol";
 
 contract StreamTest is Test {
-    event CreateStream(
+    event StreamCreated(
         address indexed payer,
         address indexed recipient,
         uint256 tokenAmount,
@@ -18,12 +18,20 @@ contract StreamTest is Test {
         uint256 stopTime
     );
 
+    event TokensWithdrawn(address indexed recipient, uint256 amount);
+
     ERC20Mock token;
     Stream s;
 
-    function setUp() public {
+    function setUp() public virtual {
         token = new ERC20Mock("mock-token", "MOK", address(1), 0);
         s = new Stream();
+    }
+}
+
+contract StreamInitializeTest is StreamTest {
+    function setUp() public override {
+        super.setUp();
     }
 
     function test_initialize_revertsWhenCalledTwice() public {
@@ -108,7 +116,7 @@ contract StreamTest is Test {
 
     function test_initialize_savesStreamAndEmitsEvent() public {
         vm.expectEmit(true, true, true, true);
-        emit CreateStream(
+        emit StreamCreated(
             address(0x11),
             address(0x22),
             2000,
@@ -144,5 +152,100 @@ contract StreamTest is Test {
         assertEq(recipient, address(0x22));
         assertEq(payer, address(0x11));
         assertEq(tokenAddress, address(token));
+    }
+}
+
+contract StreamWithdrawTest is StreamTest {
+    uint256 constant DURATION = 1000;
+    uint256 constant STREAM_AMOUNT = 2000;
+
+    uint256 startTime;
+    uint256 stopTime;
+    address payer = address(0x11);
+    address recipient = address(0x22);
+
+    function setUp() public override {
+        super.setUp();
+
+        startTime = block.timestamp;
+        stopTime = block.timestamp + DURATION;
+
+        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
+    }
+
+    function test_withdraw_revertsGivenAmountZero() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.CantWithdrawZero.selector));
+        vm.prank(recipient);
+        s.withdraw(0);
+    }
+
+    function test_withdraw_revertsWhenCalledNotByRecipientOrPayer() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.CallerNotPayerOrRecipient.selector));
+        s.withdraw(1);
+    }
+
+    function test_withdraw_revertsWhenAmountExceedsStreamTotal() public {
+        vm.warp(stopTime + 1);
+
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        vm.prank(recipient);
+        s.withdraw(STREAM_AMOUNT + 1);
+    }
+
+    function test_withdraw_revertsWhenAmountExceedsBalance() public {
+        vm.warp(startTime + 1);
+        uint256 balance = s.balanceOf(recipient);
+
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        vm.prank(recipient);
+        s.withdraw(balance + 1);
+    }
+
+    function test_withdraw_revertsWhenStreamNotFunded() public {
+        vm.warp(startTime + 1);
+        uint256 balance = s.balanceOf(recipient);
+
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        vm.prank(recipient);
+        s.withdraw(balance);
+    }
+
+    function test_withdraw_transfersTokensAndEmits() public {
+        uint256 amount = STREAM_AMOUNT / 2;
+        token.mint(address(s), STREAM_AMOUNT);
+        vm.warp(startTime + (DURATION / 2));
+
+        vm.expectEmit(true, true, true, true);
+        emit TokensWithdrawn(recipient, amount);
+
+        vm.prank(recipient);
+        s.withdraw(amount);
+
+        assertEq(token.balanceOf(recipient), amount);
+        assertEq(token.balanceOf(address(s)), STREAM_AMOUNT - amount);
+    }
+
+    function test_withdraw_updatesRemainingBalance() public {
+        uint256 amount = STREAM_AMOUNT / 2;
+        token.mint(address(s), STREAM_AMOUNT);
+        vm.warp(startTime + (DURATION / 2));
+
+        vm.prank(recipient);
+        s.withdraw(amount);
+
+        (, uint256 remainingBalance,,,,,,) = s.stream();
+        assertEq(remainingBalance, STREAM_AMOUNT - amount);
+    }
+
+    function test_withdraw_payerCanWithdrawForRecipient() public {
+        uint256 amount = STREAM_AMOUNT / 2;
+        token.mint(address(s), STREAM_AMOUNT);
+        vm.warp(startTime + (DURATION / 2));
+
+        vm.expectEmit(true, true, true, true);
+        emit TokensWithdrawn(recipient, amount);
+
+        vm.prank(payer);
+        s.withdraw(amount);
     }
 }

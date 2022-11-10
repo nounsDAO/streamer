@@ -46,12 +46,12 @@ contract StreamFactoryTest is Test {
 
         vm.prank(recipient);
         vm.expectRevert("ERC20: transfer amount exceeds balance");
-        stream.withdrawFromStream(10_000e6);
+        stream.withdraw(10_000e6);
 
         token.mint(address(stream), tokenAmount);
 
         vm.prank(recipient);
-        stream.withdrawFromStream(10_000e6);
+        stream.withdraw(10_000e6);
 
         assertEq(token.balanceOf(recipient), 10_000e6);
     }
@@ -73,7 +73,7 @@ contract StreamFactoryTest is Test {
         vm.warp(startTime + 30 days);
 
         vm.prank(recipient);
-        IStream(predictedAddress).withdrawFromStream(10_000e6);
+        IStream(predictedAddress).withdraw(10_000e6);
 
         assertEq(token.balanceOf(recipient), 10_000e6);
     }

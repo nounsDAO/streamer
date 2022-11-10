@@ -12,5 +12,5 @@ interface IStream {
         uint256 stopTime
     ) external;
 
-    function withdrawFromStream(uint256 amount) external returns (bool);
+    function withdraw(uint256 amount) external;
 }

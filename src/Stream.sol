@@ -20,8 +20,11 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
     error DurationMustBePositive();
     error TokenAmountLessThanDuration();
     error TokenAmountNotMultipleOfDuration();
+    error CantWithdrawZero();
+    error AmountExceedsBalance();
+    error CallerNotPayerOrRecipient();
 
-    event CreateStream(
+    event StreamCreated(
         address indexed payer,
         address indexed recipient,
         uint256 tokenAmount,
@@ -30,9 +33,20 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
         uint256 stopTime
     );
 
-    event WithdrawFromStream(address indexed recipient, uint256 amount);
+    event TokensWithdrawn(address indexed recipient, uint256 amount);
 
     Types.Stream public stream;
+
+    /**
+     * @dev Throws if the caller is not the sender of the recipient of the stream.
+     */
+    modifier onlySenderOrRecipient() {
+        if (msg.sender != stream.recipient && msg.sender != stream.payer) {
+            revert CallerNotPayerOrRecipient();
+        }
+
+        _;
+    }
 
     function initialize(
         address payer,
@@ -64,44 +78,19 @@ contract Stream is IStream, Initializable, ReentrancyGuard, CarefulMath {
             tokenAddress: tokenAddress
         });
 
-        emit CreateStream(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
+        emit StreamCreated(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
     }
 
-    /**
-     * @dev Throws if the caller is not the sender of the recipient of the stream.
-     */
-    modifier onlySenderOrRecipient() {
-        require(
-            msg.sender == stream.payer || msg.sender == stream.recipient,
-            "caller is not the sender or the recipient of the stream"
-        );
-        _;
-    }
-
-    function withdrawFromStream(uint256 amount)
-        external
-        nonReentrant
-        onlySenderOrRecipient
-        returns (bool)
-    {
-        require(amount > 0, "amount is zero");
+    function withdraw(uint256 amount) external nonReentrant onlySenderOrRecipient {
+        if (amount == 0) revert CantWithdrawZero();
 
         uint256 balance = balanceOf(stream.recipient);
-        require(balance >= amount, "amount exceeds the available balance");
+        if (balance < amount) revert AmountExceedsBalance();
 
-        MathError mathErr;
-        (mathErr, stream.remainingBalance) = subUInt(stream.remainingBalance, amount);
-        /**
-         * `subUInt` can only return MathError.INTEGER_UNDERFLOW but we know that `remainingBalance` is at least
-         * as big as `amount`.
-         */
-        assert(mathErr == MathError.NO_ERROR);
-
-        if (stream.remainingBalance == 0) delete stream;
+        stream.remainingBalance = stream.remainingBalance - amount;
 
         IERC20(stream.tokenAddress).safeTransfer(stream.recipient, amount);
-        emit WithdrawFromStream(stream.recipient, amount);
-        return true;
+        emit TokensWithdrawn(stream.recipient, amount);
     }
 
     /**
