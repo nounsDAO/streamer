@@ -9,6 +9,14 @@ import { Stream } from "../src/Stream.sol";
 import { IStream } from "../src/IStream.sol";
 
 contract StreamTest is Test {
+    uint256 constant DURATION = 1000;
+    uint256 constant STREAM_AMOUNT = 2000;
+
+    uint256 startTime;
+    uint256 stopTime;
+    address payer = address(0x11);
+    address recipient = address(0x22);
+
     event StreamCreated(
         address indexed payer,
         address indexed recipient,
@@ -26,6 +34,9 @@ contract StreamTest is Test {
     function setUp() public virtual {
         token = new ERC20Mock("mock-token", "MOK", address(1), 0);
         s = new Stream();
+
+        startTime = block.timestamp;
+        stopTime = block.timestamp + DURATION;
     }
 }
 
@@ -35,140 +46,77 @@ contract StreamInitializeTest is StreamTest {
     }
 
     function test_initialize_revertsWhenCalledTwice() public {
-        s.initialize(
-            address(0x11),
-            address(0x22),
-            1000,
-            address(token),
-            block.timestamp,
-            block.timestamp + 1000
-        );
+        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
 
         vm.expectRevert("Initializable: contract is already initialized");
-        s.initialize(
-            address(0x11),
-            address(0x22),
-            1000,
-            address(token),
-            block.timestamp,
-            block.timestamp + 1000
-        );
+        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
     }
 
     function test_initialize_revertsWhenPayerIsAddressZero() public {
         vm.expectRevert(abi.encodeWithSelector(Stream.PayerIsAddressZero.selector));
-        s.initialize(
-            address(0), address(0x22), 1000, address(token), block.timestamp, block.timestamp + 1000
-        );
+        s.initialize(address(0), recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
     }
 
     function test_initialize_revertsWhenRecipientIsAddressZero() public {
         vm.expectRevert(abi.encodeWithSelector(Stream.RecipientIsAddressZero.selector));
-        s.initialize(
-            address(0x11), address(0), 1000, address(token), block.timestamp, block.timestamp + 1000
-        );
+        s.initialize(payer, address(0), STREAM_AMOUNT, address(token), startTime, stopTime);
     }
 
     function test_initialize_revertsWhenRecipientIsTheStreamContract() public {
         vm.expectRevert(abi.encodeWithSelector(Stream.RecipientIsStreamContract.selector));
-        s.initialize(
-            address(0x11), address(s), 1000, address(token), block.timestamp, block.timestamp + 1000
-        );
+        s.initialize(payer, address(s), STREAM_AMOUNT, address(token), startTime, stopTime);
     }
 
     function test_initialize_revertsWhenTokenAmountIsZero() public {
         vm.expectRevert(abi.encodeWithSelector(Stream.TokenAmountIsZero.selector));
-        s.initialize(
-            address(0x11), address(0x22), 0, address(token), block.timestamp, block.timestamp + 1000
-        );
+        s.initialize(payer, recipient, 0, address(token), startTime, stopTime);
     }
 
     function test_initialize_revertsWhenDurationIsNotPositive() public {
         vm.expectRevert(abi.encodeWithSelector(Stream.DurationMustBePositive.selector));
-        s.initialize(
-            address(0x11), address(0x22), 1000, address(token), block.timestamp, block.timestamp
-        );
+        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, startTime);
     }
 
     function test_initialize_revertsWhenAmountLessThanDuration() public {
         vm.expectRevert(abi.encodeWithSelector(Stream.TokenAmountLessThanDuration.selector));
-        s.initialize(
-            address(0x11),
-            address(0x22),
-            999,
-            address(token),
-            block.timestamp,
-            block.timestamp + 1000
-        );
+        s.initialize(payer, recipient, DURATION - 1, address(token), startTime, stopTime);
     }
 
     function test_initialize_revertsWhenAmountModDurationNotZero() public {
         vm.expectRevert(abi.encodeWithSelector(Stream.TokenAmountNotMultipleOfDuration.selector));
-        s.initialize(
-            address(0x11),
-            address(0x22),
-            1001,
-            address(token),
-            block.timestamp,
-            block.timestamp + 1000
-        );
+        s.initialize(payer, recipient, DURATION + 1, address(token), startTime, stopTime);
     }
 
     function test_initialize_savesStreamAndEmitsEvent() public {
         vm.expectEmit(true, true, true, true);
-        emit StreamCreated(
-            address(0x11),
-            address(0x22),
-            2000,
-            address(token),
-            block.timestamp,
-            block.timestamp + 1000
-            );
+        emit StreamCreated(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
 
-        s.initialize(
-            address(0x11),
-            address(0x22),
-            2000,
-            address(token),
-            block.timestamp,
-            block.timestamp + 1000
-        );
+        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
 
         (
             uint256 tokenAmount,
             uint256 remainingBalance,
             uint256 ratePerSecond,
-            uint256 startTime,
-            uint256 stopTime,
-            address recipient,
-            address payer,
+            uint256 actualStartTime,
+            uint256 actualStopTime,
+            address actualRecipient,
+            address actualPayer,
             address tokenAddress
         ) = s.stream();
-        assertEq(tokenAmount, 2000);
-        assertEq(remainingBalance, 2000);
+        assertEq(tokenAmount, STREAM_AMOUNT);
+        assertEq(remainingBalance, STREAM_AMOUNT);
         assertEq(ratePerSecond, 2);
-        assertEq(startTime, block.timestamp);
-        assertEq(stopTime, block.timestamp + 1000);
-        assertEq(recipient, address(0x22));
-        assertEq(payer, address(0x11));
+        assertEq(actualStartTime, startTime);
+        assertEq(actualStopTime, stopTime);
+        assertEq(actualRecipient, recipient);
+        assertEq(actualPayer, payer);
         assertEq(tokenAddress, address(token));
     }
 }
 
 contract StreamWithdrawTest is StreamTest {
-    uint256 constant DURATION = 1000;
-    uint256 constant STREAM_AMOUNT = 2000;
-
-    uint256 startTime;
-    uint256 stopTime;
-    address payer = address(0x11);
-    address recipient = address(0x22);
-
     function setUp() public override {
         super.setUp();
-
-        startTime = block.timestamp;
-        stopTime = block.timestamp + DURATION;
 
         s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
     }
