@@ -9,8 +9,21 @@ import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.so
 import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 import { IStream } from "./IStream.sol";
 
+/**
+ * @title Stream
+ * @notice Allows a payer to pay a recipient an amount of tokens over time, at a regular rate per second.
+ * Once the stream begins vested tokens can be withdrawn at any time.
+ * Either party can choose to cancel, in which case the stream distributes each party's fair share of tokens.
+ * @dev A fork of Sablier https://github.com/sablierhq/sablier/blob/%40sablier/protocol%401.1.0/packages/protocol/contracts/Sablier.sol
+ */
 contract Stream is IStream, Initializable, ReentrancyGuard {
     using SafeERC20 for IERC20;
+
+    /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   ERRORS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
 
     error PayerIsAddressZero();
     error RecipientIsAddressZero();
@@ -22,6 +35,12 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
     error CantWithdrawZero();
     error AmountExceedsBalance();
     error CallerNotPayerOrRecipient();
+
+    /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   EVENTS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
 
     event StreamCreated(
         address indexed payer,
@@ -41,6 +60,12 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         uint256 recipientBalance
     );
 
+    /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   STORAGE VARIABLES
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
+
     uint256 public tokenAmount;
     uint256 public remainingBalance;
     uint256 public ratePerSecond;
@@ -51,7 +76,13 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
     address public tokenAddress;
 
     /**
-     * @dev Throws if the caller is not the sender of the recipient of the stream.
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   MODIFIERS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
+
+    /**
+     * @dev Reverts if the caller is not the payer or the recipient of the stream.
      */
     modifier onlyPayerOrRecipient() {
         if (msg.sender != recipient && msg.sender != payer) {
@@ -60,6 +91,12 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
 
         _;
     }
+
+    /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   INITIALIZER
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
 
     function initialize(
         address _payer,
@@ -92,6 +129,18 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         emit StreamCreated(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
     }
 
+    /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   EXTERNAL TXS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
+
+    /**
+     * @notice Withdraw tokens to recipient's account.
+     * Execution fails if the requested amount is greater than recipient's withdrawable balance.
+     * Only this stream's payer or recipient can call this function.
+     * @param amount the amount of tokens to withdraw.
+     */
     function withdraw(uint256 amount) external nonReentrant onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient;
@@ -105,6 +154,13 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         emit TokensWithdrawn(recipient_, amount);
     }
 
+    /**
+     * @notice Cancel the stream and send payer and recipient their fair share of the funds.
+     * If the stream is sufficiently funded to pay recipient, execution will always succeed.
+     * Payer receives the stream's token balance after paying recipient, which is fair if payer
+     * hadn't fully funded the stream.
+     * Only this stream's payer or recipient can call this function.
+     */
     function cancel() external nonReentrant onlyPayerOrRecipient {
         address payer_ = payer;
         address recipient_ = recipient;
@@ -122,7 +178,13 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
     }
 
     /**
-     * @notice Returns the available funds to withdraw
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   VIEW FUNCTIONS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
+
+    /**
+     * @notice Returns the available funds to withdraw.
      * @param who The address for which to query the balance.
      * @return balance The total funds allocated to `who` as uint256.
      */
@@ -161,6 +223,15 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         return (tokenBalance(), remainingBalance);
     }
 
+    /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   INTERNAL FUNCTIONS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
+
+    /**
+     * @dev Helper function that makes the rest of the code look nicer.
+     */
     function tokenBalance() internal view returns (uint256) {
         return IERC20(tokenAddress).balanceOf(address(this));
     }
