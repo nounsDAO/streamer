@@ -89,11 +89,6 @@ contract StreamInitializeTest is StreamTest {
         s.initialize(payer, recipient, DURATION - 1, address(token), startTime, stopTime);
     }
 
-    function test_initialize_revertsWhenAmountModDurationNotZero() public {
-        vm.expectRevert(abi.encodeWithSelector(Stream.TokenAmountNotMultipleOfDuration.selector));
-        s.initialize(payer, recipient, DURATION + 1, address(token), startTime, stopTime);
-    }
-
     function test_initialize_savesStreamAndEmitsEvent() public {
         vm.expectEmit(true, true, true, true);
         emit StreamCreated(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
@@ -102,7 +97,7 @@ contract StreamInitializeTest is StreamTest {
 
         assertEq(s.tokenAmount(), STREAM_AMOUNT);
         assertEq(s.remainingBalance(), STREAM_AMOUNT);
-        assertEq(s.ratePerSecond(), 2);
+        assertEq(s.ratePerSecond(), 2 * s.RATE_DECIMALS());
         assertEq(s.startTime(), startTime);
         assertEq(s.stopTime(), stopTime);
         assertEq(s.recipient(), recipient);
@@ -431,6 +426,69 @@ contract StreamTokenAndOutstandingBalanceTest is StreamTest {
         (, remainingBalance) = s.tokenAndOutstandingBalance();
         assertEq(remainingBalance, 0);
 
+        vm.stopPrank();
+    }
+}
+
+contract StreamWithRemainderTest is StreamTest {
+    function setUp() public override {
+        super.setUp();
+
+        uint256 streamAmount = 2_000 * 1e6; // 2K USDC; USDC has 6 decimals
+        uint256 duration = 300;
+        startTime = block.timestamp;
+        stopTime = startTime + duration;
+
+        s.initialize(payer, recipient, streamAmount, address(token), startTime, stopTime);
+
+        // streamAmount / duration = 6666666.66666667
+        // assuming RATE_DECIMALS = 6, we get 6666666666666
+        assertEq(s.ratePerSecond(), 6666666666666);
+    }
+
+    function test_balanceOf_usesRateDecimalsMidStream() public {
+        vm.warp(startTime + 150);
+        assertEq(s.balanceOf(recipient), 999999999);
+
+        vm.warp(startTime + 200);
+        assertEq(s.balanceOf(recipient), 1333333333);
+    }
+
+    function test_withdraw_usesRateDecimalsMidStream() public {
+        token.mint(address(s), s.tokenAmount());
+
+        vm.startPrank(recipient);
+
+        vm.warp(startTime + 150);
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        s.withdraw(1000000000);
+
+        s.withdraw(999999999);
+        assertEq(token.balanceOf(recipient), 999999999);
+
+        vm.warp(startTime + 200);
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        s.withdraw(333333335);
+
+        s.withdraw(333333334);
+        assertEq(token.balanceOf(recipient), 1333333333);
+
+        vm.stopPrank();
+    }
+
+    function test_balanceOf_noDustAtEndOfStream() public {
+        vm.warp(stopTime);
+        assertEq(s.balanceOf(recipient), s.tokenAmount());
+    }
+
+    function test_withdraw_noDustAtEndOfStream() public {
+        token.mint(address(s), s.tokenAmount());
+        vm.warp(stopTime);
+        vm.startPrank(recipient);
+
+        s.withdraw(s.tokenAmount());
+
+        assertEq(token.balanceOf(recipient), s.tokenAmount());
         vm.stopPrank();
     }
 }

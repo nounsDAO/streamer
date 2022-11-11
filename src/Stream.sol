@@ -31,7 +31,6 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
     error TokenAmountIsZero();
     error DurationMustBePositive();
     error TokenAmountLessThanDuration();
-    error TokenAmountNotMultipleOfDuration();
     error CantWithdrawZero();
     error AmountExceedsBalance();
     error CallerNotPayerOrRecipient();
@@ -65,6 +64,8 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      *   STORAGE VARIABLES
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
+
+    uint256 public constant RATE_DECIMALS = 1e6;
 
     uint256 public tokenAmount;
     uint256 public remainingBalance;
@@ -115,11 +116,10 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         uint256 duration = _stopTime - _startTime;
 
         if (_tokenAmount < duration) revert TokenAmountLessThanDuration();
-        if (_tokenAmount % duration != 0) revert TokenAmountNotMultipleOfDuration();
 
         remainingBalance = _tokenAmount;
         tokenAmount = _tokenAmount;
-        ratePerSecond = _tokenAmount / duration;
+        ratePerSecond = (RATE_DECIMALS * _tokenAmount) / duration;
         recipient = _recipient;
         payer = _payer;
         startTime = _startTime;
@@ -191,7 +191,11 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
     function balanceOf(address who) public view returns (uint256) {
         uint256 tokenAmount_ = tokenAmount;
         uint256 remainingBalance_ = remainingBalance;
-        uint256 recipientBalance = elapsedTime() * ratePerSecond;
+
+        uint256 recipientBalance = (elapsedTime() * ratePerSecond) / RATE_DECIMALS;
+        if (block.timestamp >= stopTime) {
+            recipientBalance = tokenAmount_;
+        }
 
         // Take withdrawals into account
         if (tokenAmount_ > remainingBalance_) {
