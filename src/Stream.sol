@@ -42,15 +42,6 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
-    event StreamCreated(
-        address indexed payer,
-        address indexed recipient,
-        uint256 tokenAmount,
-        address tokenAddress,
-        uint256 startTime,
-        uint256 stopTime
-    );
-
     event TokensWithdrawn(address indexed recipient, uint256 amount);
 
     event StreamCancelled(
@@ -125,8 +116,6 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         startTime = _startTime;
         stopTime = _stopTime;
         tokenAddress = _tokenAddress;
-
-        emit StreamCreated(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
     }
 
     /**
