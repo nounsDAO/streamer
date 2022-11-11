@@ -189,23 +189,11 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      * @return uint256 The total funds allocated to `who` as uint256.
      */
     function balanceOf(address who) public view returns (uint256) {
-        uint256 tokenAmount_ = tokenAmount;
-        uint256 remainingBalance_ = remainingBalance;
-
-        uint256 recipientBalance = (elapsedTime() * ratePerSecond) / RATE_DECIMALS;
-        if (block.timestamp >= stopTime) {
-            recipientBalance = tokenAmount_;
-        }
-
-        // Take withdrawals into account
-        if (tokenAmount_ > remainingBalance_) {
-            uint256 withdrawalAmount = tokenAmount_ - remainingBalance_;
-            recipientBalance -= withdrawalAmount;
-        }
+        uint256 recipientBalance = _recipientBalance();
 
         if (who == recipient) return recipientBalance;
         if (who == payer) {
-            return remainingBalance_ - recipientBalance;
+            return remainingBalance - recipientBalance;
         }
         return 0;
     }
@@ -232,6 +220,35 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      *   INTERNAL FUNCTIONS
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
+
+    /**
+     * @dev Helper function for `balanceOf` in calculating recipient's fair share of tokens, taking withdrawals into account.
+     */
+    function _recipientBalance() internal view returns (uint256) {
+        uint256 startTime_ = startTime;
+        uint256 blockTime = block.timestamp;
+
+        if (blockTime <= startTime_) return 0;
+
+        uint256 tokenAmount_ = tokenAmount;
+        uint256 balance;
+        if (blockTime >= stopTime) {
+            balance = tokenAmount_;
+        } else {
+            uint256 elapsedTime_ = blockTime - startTime_;
+            balance = (elapsedTime_ * ratePerSecond) / RATE_DECIMALS;
+        }
+
+        uint256 remainingBalance_ = remainingBalance;
+
+        // Take withdrawals into account
+        if (tokenAmount_ > remainingBalance_) {
+            uint256 withdrawalAmount = tokenAmount_ - remainingBalance_;
+            balance -= withdrawalAmount;
+        }
+
+        return balance;
+    }
 
     /**
      * @dev Helper function that makes the rest of the code look nicer.
