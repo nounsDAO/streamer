@@ -1,0 +1,43 @@
+specVersion: 0.0.4
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: StreamFactory
+    network: mainnet
+    source:
+      abi: StreamFactory
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.6
+      language: wasm/assemblyscript
+      file: ./src/StreamFactory.ts
+      entities:
+        - Stream
+      abis:
+        - name: StreamFactory
+          file: ./abis/StreamFactory.json
+      eventHandlers:
+        - event: StreamCreated(indexed address,indexed address,uint256,address,uint256,uint256,address)
+          handler: handleStreamCreated
+templates:
+  - name: Stream
+    kind: ethereum/contract
+    network: mainnet
+    source:
+      abi: Stream
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.6
+      language: wasm/assemblyscript
+      file: ./src/Stream.ts
+      entities:
+        - Stream
+      abis:
+        - name: Stream
+          file: ./abis/Stream.json
+      eventHandlers:
+        - event: TokensWithdrawn(indexed address,uint256)
+          handler: handleTokensWithdrawn
+        - event: StreamCancelled(indexed address,indexed address,uint256,uint256)
+          handler: handleStreamCancelled

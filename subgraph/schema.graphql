@@ -1,0 +1,33 @@
+type Stream @entity {
+  "The address of the stream contract"
+  id: Bytes!
+
+  payer: Bytes!
+
+  recipient: Bytes!
+
+  tokenAmount: BigInt!
+
+  tokenAddress: Bytes!
+
+  startTime: BigInt!
+
+  stopTime: BigInt!
+
+  cancelled: Boolean!
+
+  cancelledAt: BigInt
+
+  withdrawals: [Withdrawal!]! @derivedFrom(field: "stream")
+}
+
+type Withdrawal @entity {
+  "The withdrawal tx hash"
+  id: Bytes!
+
+  "The stream withdrawn from"
+  stream: Stream!
+
+  "The withdrawal amount"
+  amount: BigInt!
+}

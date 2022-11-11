@@ -1,0 +1,14 @@
+{
+  "goerli": {
+    "Payer": {
+      "address": "",
+      "startBlock": 0
+    }
+  },
+  "mainnet": {
+    "Payer": {
+      "address": "",
+      "startBlock": 0
+    }
+  }
+}
