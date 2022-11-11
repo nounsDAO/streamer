@@ -1,5 +1,6 @@
 import { StreamCreated } from "../generated/StreamFactory/StreamFactory";
 import { Stream } from "../generated/schema";
+import { Stream as StreamTemplate } from "../generated/templates";
 
 export function handleStreamCreated(event: StreamCreated): void {
   let s = new Stream(event.params.streamAddress);
@@ -11,6 +12,8 @@ export function handleStreamCreated(event: StreamCreated): void {
   s.startTime = event.params.startTime;
   s.stopTime = event.params.stopTime;
   s.cancelled = false;
+
+  StreamTemplate.create(event.params.streamAddress);
 
   s.save();
 }
