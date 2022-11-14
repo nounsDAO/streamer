@@ -17,15 +17,6 @@ contract StreamTest is Test {
     address payer = address(0x11);
     address recipient = address(0x22);
 
-    event StreamCreated(
-        address indexed payer,
-        address indexed recipient,
-        uint256 tokenAmount,
-        address tokenAddress,
-        uint256 startTime,
-        uint256 stopTime
-    );
-
     event TokensWithdrawn(address indexed recipient, uint256 amount);
 
     event StreamCancelled(
@@ -89,10 +80,7 @@ contract StreamInitializeTest is StreamTest {
         s.initialize(payer, recipient, DURATION - 1, address(token), startTime, stopTime);
     }
 
-    function test_initialize_savesStreamAndEmitsEvent() public {
-        vm.expectEmit(true, true, true, true);
-        emit StreamCreated(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
-
+    function test_initialize_savesStreamParameters() public {
         s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
 
         assertEq(s.tokenAmount(), STREAM_AMOUNT);
