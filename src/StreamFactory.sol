@@ -32,7 +32,7 @@ contract StreamFactory {
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
-    address immutable streamImplementation;
+    address public immutable streamImplementation;
 
     constructor(address streamImplementation_) {
         streamImplementation = streamImplementation_;
