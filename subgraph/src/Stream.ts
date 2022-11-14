@@ -3,7 +3,7 @@ import { TokensWithdrawn, StreamCancelled } from "../generated/templates/Stream/
 import { Stream, Withdrawal } from "../generated/schema";
 
 export function handleTokensWithdrawn(event: TokensWithdrawn): void {
-  let withdrawal = new Withdrawal(event.transaction.hash);
+  let withdrawal = new Withdrawal(event.transaction.hash.toHex() + "-" + event.logIndex.toString());
   withdrawal.stream = event.address;
   withdrawal.amount = event.params.amount;
   withdrawal.save();

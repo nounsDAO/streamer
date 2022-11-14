@@ -22,8 +22,8 @@ type Stream @entity {
 }
 
 type Withdrawal @entity {
-  "The withdrawal tx hash"
-  id: Bytes!
+  "A concatination of the withdrawal tx hash and the the event log index"
+  id: String!
 
   "The stream withdrawn from"
   stream: Stream!
