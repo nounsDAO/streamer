@@ -31,7 +31,6 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
     error TokenAmountIsZero();
     error DurationMustBePositive();
     error TokenAmountLessThanDuration();
-    error TokenAmountNotMultipleOfDuration();
     error CantWithdrawZero();
     error AmountExceedsBalance();
     error CallerNotPayerOrRecipient();
@@ -56,6 +55,8 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      *   STORAGE VARIABLES
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
+
+    uint256 public constant RATE_DECIMALS_MULTIPLIER = 1e6;
 
     uint256 public tokenAmount;
     uint256 public remainingBalance;
@@ -106,16 +107,23 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         uint256 duration = _stopTime - _startTime;
 
         if (_tokenAmount < duration) revert TokenAmountLessThanDuration();
-        if (_tokenAmount % duration != 0) revert TokenAmountNotMultipleOfDuration();
 
         remainingBalance = _tokenAmount;
         tokenAmount = _tokenAmount;
-        ratePerSecond = _tokenAmount / duration;
         recipient = _recipient;
         payer = _payer;
         startTime = _startTime;
         stopTime = _stopTime;
         tokenAddress = _tokenAddress;
+
+        // ratePerSecond can lose precision as its being rounded down here
+        // the value lost in rounding down results in less income per second for recipient
+        // max round down impact is duration - 1; e.g. one year, that's 31_557_599
+        // e.g. using USDC (w/ 6 decimals) that's ~32 USDC
+        // since ratePerSecond has 6 decimals, 31_557_599 / 1e6 = 0.00003156; round down impact becomes negligible
+        // finally, this remainder dust becomes available to recipient when stream duration is fully elapsed
+        // see `_recipientBalance` where `blockTime >= stopTime`
+        ratePerSecond = (RATE_DECIMALS_MULTIPLIER * _tokenAmount) / duration;
     }
 
     /**
@@ -178,19 +186,11 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      * @return uint256 The total funds allocated to `who` as uint256.
      */
     function balanceOf(address who) public view returns (uint256) {
-        uint256 tokenAmount_ = tokenAmount;
-        uint256 remainingBalance_ = remainingBalance;
-        uint256 recipientBalance = elapsedTime() * ratePerSecond;
-
-        // Take withdrawals into account
-        if (tokenAmount_ > remainingBalance_) {
-            uint256 withdrawalAmount = tokenAmount_ - remainingBalance_;
-            recipientBalance -= withdrawalAmount;
-        }
+        uint256 recipientBalance = _recipientBalance();
 
         if (who == recipient) return recipientBalance;
         if (who == payer) {
-            return remainingBalance_ - recipientBalance;
+            return remainingBalance - recipientBalance;
         }
         return 0;
     }
@@ -199,9 +199,13 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      * @notice Returns the time elapsed in this stream, or zero if it hasn't started yet.
      */
     function elapsedTime() public view returns (uint256) {
-        if (block.timestamp <= startTime) return 0;
-        if (block.timestamp < stopTime) return block.timestamp - startTime;
-        return stopTime - startTime;
+        uint256 startTime_ = startTime;
+        if (block.timestamp <= startTime_) return 0;
+
+        uint256 stopTime_ = stopTime;
+        if (block.timestamp < stopTime_) return block.timestamp - startTime_;
+
+        return stopTime_ - startTime_;
     }
 
     /**
@@ -217,6 +221,35 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      *   INTERNAL FUNCTIONS
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
+
+    /**
+     * @dev Helper function for `balanceOf` in calculating recipient's fair share of tokens, taking withdrawals into account.
+     */
+    function _recipientBalance() internal view returns (uint256) {
+        uint256 startTime_ = startTime;
+        uint256 blockTime = block.timestamp;
+
+        if (blockTime <= startTime_) return 0;
+
+        uint256 tokenAmount_ = tokenAmount;
+        uint256 balance;
+        if (blockTime >= stopTime) {
+            balance = tokenAmount_;
+        } else {
+            uint256 elapsedTime_ = blockTime - startTime_;
+            balance = (elapsedTime_ * ratePerSecond) / RATE_DECIMALS_MULTIPLIER;
+        }
+
+        uint256 remainingBalance_ = remainingBalance;
+
+        // Take withdrawals into account
+        if (tokenAmount_ > remainingBalance_) {
+            uint256 withdrawalAmount = tokenAmount_ - remainingBalance_;
+            balance -= withdrawalAmount;
+        }
+
+        return balance;
+    }
 
     /**
      * @dev Helper function that makes the rest of the code look nicer.
