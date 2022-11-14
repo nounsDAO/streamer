@@ -199,9 +199,13 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      * @notice Returns the time elapsed in this stream, or zero if it hasn't started yet.
      */
     function elapsedTime() public view returns (uint256) {
-        if (block.timestamp <= startTime) return 0;
-        if (block.timestamp < stopTime) return block.timestamp - startTime;
-        return stopTime - startTime;
+        uint256 startTime_ = startTime;
+        if (block.timestamp <= startTime_) return 0;
+
+        uint256 stopTime_ = stopTime;
+        if (block.timestamp < stopTime_) return block.timestamp - startTime_;
+
+        return stopTime_ - startTime_;
     }
 
     /**
