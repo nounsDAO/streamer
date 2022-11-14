@@ -65,7 +65,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
-    uint256 public constant RATE_DECIMALS = 1e6;
+    uint256 public constant RATE_DECIMALS_MULTIPLIER = 1e6;
 
     uint256 public tokenAmount;
     uint256 public remainingBalance;
@@ -119,7 +119,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
 
         remainingBalance = _tokenAmount;
         tokenAmount = _tokenAmount;
-        ratePerSecond = (RATE_DECIMALS * _tokenAmount) / duration;
+        ratePerSecond = (RATE_DECIMALS_MULTIPLIER * _tokenAmount) / duration;
         recipient = _recipient;
         payer = _payer;
         startTime = _startTime;
@@ -236,7 +236,7 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
             balance = tokenAmount_;
         } else {
             uint256 elapsedTime_ = blockTime - startTime_;
-            balance = (elapsedTime_ * ratePerSecond) / RATE_DECIMALS;
+            balance = (elapsedTime_ * ratePerSecond) / RATE_DECIMALS_MULTIPLIER;
         }
 
         uint256 remainingBalance_ = remainingBalance;

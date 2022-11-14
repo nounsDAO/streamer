@@ -97,7 +97,7 @@ contract StreamInitializeTest is StreamTest {
 
         assertEq(s.tokenAmount(), STREAM_AMOUNT);
         assertEq(s.remainingBalance(), STREAM_AMOUNT);
-        assertEq(s.ratePerSecond(), 2 * s.RATE_DECIMALS());
+        assertEq(s.ratePerSecond(), 2 * s.RATE_DECIMALS_MULTIPLIER());
         assertEq(s.startTime(), startTime);
         assertEq(s.stopTime(), stopTime);
         assertEq(s.recipient(), recipient);
@@ -442,7 +442,7 @@ contract StreamWithRemainderTest is StreamTest {
         s.initialize(payer, recipient, streamAmount, address(token), startTime, stopTime);
 
         // streamAmount / duration = 6666666.66666667
-        // assuming RATE_DECIMALS = 6, we get 6666666666666
+        // assuming RATE_DECIMALS_MULTIPLIER = 6, we get 6666666666666
         assertEq(s.ratePerSecond(), 6666666666666);
     }
 
