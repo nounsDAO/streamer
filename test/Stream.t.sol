@@ -492,3 +492,66 @@ contract StreamWithRemainderTest is StreamTest {
         vm.stopPrank();
     }
 }
+
+contract StreamWithRemainderHighDurationAndAmountTest is StreamTest {
+    function setUp() public override {
+        super.setUp();
+
+        uint256 streamAmount = 1_000_000 * 1e6; // 1M USDC
+        uint256 duration = 15780000; // 6 months
+        startTime = block.timestamp;
+        stopTime = startTime + duration;
+
+        s.initialize(payer, recipient, streamAmount, address(token), startTime, stopTime);
+
+        // streamAmount / duration = 63371.35614702
+        // assuming RATE_DECIMALS_MULTIPLIER = 1e6, we get 63371356147
+        assertEq(s.ratePerSecond(), 63371356147);
+    }
+
+    function test_balanceOf_usesRateDecimalsMidStream() public {
+        vm.warp(startTime + 7890000); // half way in
+        assertEq(s.balanceOf(recipient), 499999999999);
+
+        vm.warp(startTime + 10520000); // two thirds in
+        assertEq(s.balanceOf(recipient), 666666666666);
+    }
+
+    function test_withdraw_usesRateDecimalsMidStream() public {
+        token.mint(address(s), s.tokenAmount());
+
+        vm.startPrank(recipient);
+
+        vm.warp(startTime + 7890000);
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        s.withdraw(500_000 * 1e6);
+
+        s.withdraw(499999999999);
+        assertEq(token.balanceOf(recipient), 499999999999);
+
+        vm.warp(startTime + 10520000);
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        s.withdraw(166666666668);
+
+        s.withdraw(166666666667);
+        assertEq(token.balanceOf(recipient), 666666666666);
+
+        vm.stopPrank();
+    }
+
+    function test_balanceOf_noDustAtEndOfStream() public {
+        vm.warp(stopTime);
+        assertEq(s.balanceOf(recipient), s.tokenAmount());
+    }
+
+    function test_withdraw_noDustAtEndOfStream() public {
+        token.mint(address(s), s.tokenAmount());
+        vm.warp(stopTime);
+        vm.startPrank(recipient);
+
+        s.withdraw(s.tokenAmount());
+
+        assertEq(token.balanceOf(recipient), s.tokenAmount());
+        vm.stopPrank();
+    }
+}
