@@ -10,6 +10,8 @@ import { LibClone } from "solady/utils/LibClone.sol";
 /**
  * @title Stream Factory
  * @notice Creates minimal clones of `Stream`.
+ * @dev Uses `LibClone` which creates clones with immutable arguments written into the clone's code section; this
+ * approach provides significant gas savings.
  */
 contract StreamFactory {
     using LibClone for address;
@@ -149,6 +151,9 @@ contract StreamFactory {
         uint256 stopTime,
         uint8 nonce
     ) public returns (address stream) {
+        // These input checks are here rather than in Stream because these parameters are written
+        // using clone-with-immutable-args, meaning they are already set when Stream is created and can't be
+        // verified there. The main benefit of this approach is significant gas savings.
         if (payer == address(0)) revert PayerIsAddressZero();
         if (recipient == address(0)) revert RecipientIsAddressZero();
         if (tokenAmount == 0) revert TokenAmountIsZero();
@@ -174,6 +179,13 @@ contract StreamFactory {
 
     /**
      * @notice Get the expected contract address of a stream created with the provided parameters.
+     * @param msgSender the expected `msg.sender` to create the stream.
+     * @param payer the account responsible for funding the stream.
+     * @param recipient the recipient of the stream.
+     * @param tokenAmount the total token amount payer is streaming to recipient.
+     * @param tokenAddress the contract address of the payment token.
+     * @param startTime the stream start timestamp in seconds.
+     * @param stopTime the stream end timestamp in seconds.
      */
     function predictStreamAddress(
         address msgSender,
@@ -193,6 +205,14 @@ contract StreamFactory {
      * @notice Get the expected contract address of a stream created with the provided parameters.
      * Use this version when creating streams with a non-zero `nonce`. Should only be used on the rare occasion
      * when a payer wants to create multiple streams with identical parameters.
+     * @param msgSender the expected `msg.sender` to create the stream.
+     * @param payer the account responsible for funding the stream.
+     * @param recipient the recipient of the stream.
+     * @param tokenAmount the total token amount payer is streaming to recipient.
+     * @param tokenAddress the contract address of the payment token.
+     * @param startTime the stream start timestamp in seconds.
+     * @param stopTime the stream end timestamp in seconds.
+     * @param nonce the nonce for this stream creation.
      */
     function predictStreamAddress(
         address msgSender,
@@ -217,6 +237,10 @@ contract StreamFactory {
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
+    /**
+     * @dev Encodes Stream's immutable arguments, as expected by LibClone, and in the order `Stream` uses to read
+     * their values. Any change here should result in a change in how `Stream` reads these arguments.
+     */
     function encodeData(
         address payer,
         address recipient,
@@ -230,6 +254,11 @@ contract StreamFactory {
         );
     }
 
+    /**
+     * @dev Generates the salt for `cloneDeterministic` and `predictDeterministicAddress`; salt is the unique input
+     * per Stream that results in each Stream instance having its unique address.
+     * For more info look into `LibClone` and how the `create2` opcode work.
+     */
     function salt(
         address msgSender,
         address payer,
