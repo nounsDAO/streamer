@@ -2,18 +2,19 @@
 
 pragma solidity ^0.8.17;
 
-import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
-import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
-import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 import { IStream } from "./IStream.sol";
 import { Clone } from "solady/utils/Clone.sol";
+import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
+import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title Stream
  * @notice Allows a payer to pay a recipient an amount of tokens over time, at a regular rate per second.
  * Once the stream begins vested tokens can be withdrawn at any time.
  * Either party can choose to cancel, in which case the stream distributes each party's fair share of tokens.
- * @dev A fork of Sablier https://github.com/sablierhq/sablier/blob/%40sablier/protocol%401.1.0/packages/protocol/contracts/Sablier.sol
+ * @dev A fork of Sablier https://github.com/sablierhq/sablier/blob/%40sablier/protocol%401.1.0/packages/protocol/contracts/Sablier.sol.
+ * Inherits from `Clone`, which allows Stream to read immutable arguments from its code section rather than state, resulting
+ * in significant gas savings for users.
  */
 contract Stream is IStream, Clone {
     using SafeERC20 for IERC20;
@@ -50,6 +51,10 @@ contract Stream is IStream, Clone {
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
+    /**
+     * @notice Used to add precision to `ratePerSecond`, to minimize the impact of rounding down.
+     * See `ratePerSecond()` implementation for more information.
+     */
     uint256 public constant RATE_DECIMALS_MULTIPLIER = 1e6;
 
     /**
@@ -220,6 +225,8 @@ contract Stream is IStream, Clone {
 
         if (recipientBalance > 0) token_.safeTransfer(recipient_, recipientBalance);
 
+        // Using the stream's token balance rather than any other calculated field because it gracefully
+        // supports cancelling the stream even if payer hasn't fully funded it.
         uint256 payerBalance = tokenBalance();
         if (payerBalance > 0) {
             token_.safeTransfer(payer_, payerBalance);
