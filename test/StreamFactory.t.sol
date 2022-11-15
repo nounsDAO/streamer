@@ -21,6 +21,7 @@ contract StreamFactoryTest is Test {
 
     StreamFactory factory;
 
+    address payer = address(0x1000);
     address recipient = address(0x1001);
     ERC20Mock token;
 
@@ -60,14 +61,17 @@ contract StreamFactoryTest is Test {
         uint256 startTime = 1640988000; // 2022-01-01 00:00:00
         uint256 stopTime = 1672524000; // 2023-01-01 00:00:00
         uint256 tokenAmount = 999975024000; // ~1M * 1e6
+        token.mint(payer, tokenAmount);
 
         address predictedAddress = factory.predictStreamAddress(
-            address(this), recipient, tokenAmount, address(token), startTime, stopTime
+            payer, payer, recipient, tokenAmount, address(token), startTime, stopTime
         );
 
         // Proposal would do these txs
-        factory.createStream(recipient, tokenAmount, address(token), startTime, stopTime);
-        token.mint(predictedAddress, tokenAmount);
+        vm.startPrank(payer);
+        factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
+        token.transfer(predictedAddress, tokenAmount);
+        vm.stopPrank();
         // End proposal
 
         vm.warp(startTime + 30 days);
@@ -82,9 +86,8 @@ contract StreamFactoryTest is Test {
         uint256 startTime = 1640988000;
         uint256 stopTime = 1672524000;
         uint256 tokenAmount = 999975024000;
-        address payer = address(0x4242);
         address predictedStream = factory.predictStreamAddress(
-            address(this), recipient, tokenAmount, address(token), startTime, stopTime
+            address(this), payer, recipient, tokenAmount, address(token), startTime, stopTime
         );
 
         vm.expectEmit(true, true, true, true);
@@ -118,7 +121,7 @@ contract StreamFactoryTest is Test {
         address frontrunner = address(0x1234);
 
         address predictedStream = factory.predictStreamAddress(
-            frontrunner, recipient, tokenAmount, address(token), startTime, stopTime
+            frontrunner, honestSender, recipient, tokenAmount, address(token), startTime, stopTime
         );
         vm.expectEmit(true, true, true, true);
         emit StreamCreated(
@@ -136,7 +139,7 @@ contract StreamFactoryTest is Test {
         );
 
         predictedStream = factory.predictStreamAddress(
-            honestSender, recipient, tokenAmount, address(token), startTime, stopTime
+            honestSender, honestSender, recipient, tokenAmount, address(token), startTime, stopTime
         );
         vm.expectEmit(true, true, true, true);
         emit StreamCreated(
