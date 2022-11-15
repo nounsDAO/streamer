@@ -2,17 +2,30 @@
 
 pragma solidity ^0.8.17;
 
-import { Clones } from "openzeppelin-contracts/proxy/Clones.sol";
 import { IStream } from "./IStream.sol";
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import { LibClone } from "solady/utils/LibClone.sol";
 
 /**
  * @title Stream Factory
  * @notice Creates minimal clones of `Stream`.
  */
 contract StreamFactory {
+    using LibClone for address;
     using SafeERC20 for IERC20;
+
+    /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   ERRORS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
+
+    error PayerIsAddressZero();
+    error RecipientIsAddressZero();
+    error TokenAmountIsZero();
+    error DurationMustBePositive();
+    error TokenAmountLessThanDuration();
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -136,13 +149,19 @@ contract StreamFactory {
         uint256 stopTime,
         uint8 nonce
     ) public returns (address stream) {
-        stream = Clones.cloneDeterministic(
-            streamImplementation,
+        if (payer == address(0)) revert PayerIsAddressZero();
+        if (recipient == address(0)) revert RecipientIsAddressZero();
+        if (tokenAmount == 0) revert TokenAmountIsZero();
+        if (stopTime <= startTime) revert DurationMustBePositive();
+        if (tokenAmount < stopTime - startTime) revert TokenAmountLessThanDuration();
+
+        stream = streamImplementation.cloneDeterministic(
+            encodeData(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime),
             salt(
                 msg.sender, payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, nonce
             )
         );
-        IStream(stream).initialize(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
+        IStream(stream).initialize();
 
         emit StreamCreated(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, stream);
     }
@@ -185,9 +204,10 @@ contract StreamFactory {
         uint256 stopTime,
         uint8 nonce
     ) public view returns (address) {
-        return Clones.predictDeterministicAddress(
-            streamImplementation,
-            salt(msgSender, payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, nonce)
+        return streamImplementation.predictDeterministicAddress(
+            encodeData(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime),
+            salt(msgSender, payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, nonce),
+            address(this)
         );
     }
 
@@ -196,6 +216,17 @@ contract StreamFactory {
      *   INTERNAL FUNCTIONS
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
+
+    function encodeData(
+        address payer,
+        address recipient,
+        uint256 tokenAmount,
+        address tokenAddress,
+        uint256 startTime,
+        uint256 stopTime
+    ) internal pure returns (bytes memory) {
+        return abi.encodePacked(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
+    }
 
     function salt(
         address msgSender,

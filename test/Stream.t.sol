@@ -28,10 +28,11 @@ contract StreamTest is Test {
 
     ERC20Mock token;
     Stream s;
+    StreamFactory factory;
 
     function setUp() public virtual {
-        token = new ERC20Mock("mock-token", "MOK", address(1), 0);
-        s = new Stream();
+        token = new ERC20Mock("Mock Token", "MOCK", address(1), 0);
+        factory = new StreamFactory(address(new Stream()));
 
         startTime = block.timestamp;
         stopTime = block.timestamp + DURATION;
@@ -44,53 +45,14 @@ contract StreamInitializeTest is StreamTest {
     }
 
     function test_initialize_revertsWhenCalledTwice() public {
-        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
+        s = Stream(
+            factory.createStream(
+                payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime
+            )
+        );
 
         vm.expectRevert("Initializable: contract is already initialized");
-        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
-    }
-
-    function test_initialize_revertsWhenPayerIsAddressZero() public {
-        vm.expectRevert(abi.encodeWithSelector(Stream.PayerIsAddressZero.selector));
-        s.initialize(address(0), recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
-    }
-
-    function test_initialize_revertsWhenRecipientIsAddressZero() public {
-        vm.expectRevert(abi.encodeWithSelector(Stream.RecipientIsAddressZero.selector));
-        s.initialize(payer, address(0), STREAM_AMOUNT, address(token), startTime, stopTime);
-    }
-
-    function test_initialize_revertsWhenRecipientIsTheStreamContract() public {
-        vm.expectRevert(abi.encodeWithSelector(Stream.RecipientIsStreamContract.selector));
-        s.initialize(payer, address(s), STREAM_AMOUNT, address(token), startTime, stopTime);
-    }
-
-    function test_initialize_revertsWhenTokenAmountIsZero() public {
-        vm.expectRevert(abi.encodeWithSelector(Stream.TokenAmountIsZero.selector));
-        s.initialize(payer, recipient, 0, address(token), startTime, stopTime);
-    }
-
-    function test_initialize_revertsWhenDurationIsNotPositive() public {
-        vm.expectRevert(abi.encodeWithSelector(Stream.DurationMustBePositive.selector));
-        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, startTime);
-    }
-
-    function test_initialize_revertsWhenAmountLessThanDuration() public {
-        vm.expectRevert(abi.encodeWithSelector(Stream.TokenAmountLessThanDuration.selector));
-        s.initialize(payer, recipient, DURATION - 1, address(token), startTime, stopTime);
-    }
-
-    function test_initialize_savesStreamParameters() public {
-        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
-
-        assertEq(s.tokenAmount(), STREAM_AMOUNT);
-        assertEq(s.remainingBalance(), STREAM_AMOUNT);
-        assertEq(s.ratePerSecond(), 2 * s.RATE_DECIMALS_MULTIPLIER());
-        assertEq(s.startTime(), startTime);
-        assertEq(s.stopTime(), stopTime);
-        assertEq(s.recipient(), recipient);
-        assertEq(s.payer(), payer);
-        assertEq(s.tokenAddress(), address(token));
+        s.initialize();
     }
 }
 
@@ -98,7 +60,11 @@ contract StreamWithdrawTest is StreamTest {
     function setUp() public override {
         super.setUp();
 
-        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
+        s = Stream(
+            factory.createStream(
+                payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime
+            )
+        );
     }
 
     function test_withdraw_revertsGivenAmountZero() public {
@@ -198,7 +164,11 @@ contract StreamBalanceOfTest is StreamTest {
     function setUp() public override {
         super.setUp();
 
-        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
+        s = Stream(
+            factory.createStream(
+                payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime
+            )
+        );
     }
 
     function test_balanceOf_zeroBeforeStreamStarts() public {
@@ -270,7 +240,11 @@ contract StreamCancelTest is StreamTest {
     function setUp() public override {
         super.setUp();
 
-        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
+        s = Stream(
+            factory.createStream(
+                payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime
+            )
+        );
     }
 
     function test_cancel_revertsWhenCalledNotByRecipientOrPayer() public {
@@ -454,7 +428,11 @@ contract StreamTokenAndOutstandingBalanceTest is StreamTest {
     function setUp() public override {
         super.setUp();
 
-        s.initialize(payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime);
+        s = Stream(
+            factory.createStream(
+                payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime
+            )
+        );
     }
 
     function test_tokenAndOutstandingBalance_tokenBalanceWorks() public {
@@ -503,7 +481,11 @@ contract StreamWithRemainderTest is StreamTest {
         startTime = block.timestamp;
         stopTime = startTime + duration;
 
-        s.initialize(payer, recipient, streamAmount, address(token), startTime, stopTime);
+        s = Stream(
+            factory.createStream(
+                payer, recipient, streamAmount, address(token), startTime, stopTime
+            )
+        );
 
         // streamAmount / duration = 6666666.66666667
         // assuming RATE_DECIMALS_MULTIPLIER = 6, we get 6666666666666
@@ -566,7 +548,11 @@ contract StreamWithRemainderHighDurationAndAmountTest is StreamTest {
         startTime = block.timestamp;
         stopTime = startTime + duration;
 
-        s.initialize(payer, recipient, streamAmount, address(token), startTime, stopTime);
+        s = Stream(
+            factory.createStream(
+                payer, recipient, streamAmount, address(token), startTime, stopTime
+            )
+        );
 
         // streamAmount / duration = 63371.35614702
         // assuming RATE_DECIMALS_MULTIPLIER = 1e6, we get 63371356147

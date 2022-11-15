@@ -3,14 +3,7 @@
 pragma solidity ^0.8.17;
 
 interface IStream {
-    function initialize(
-        address payer,
-        address recipient,
-        uint256 deposit,
-        address tokenAddress,
-        uint256 startTime,
-        uint256 stopTime
-    ) external;
+    function initialize() external;
 
     function withdraw(uint256 amount) external;
 }

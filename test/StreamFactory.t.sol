@@ -7,6 +7,7 @@ import { ERC20Mock } from "openzeppelin-contracts/mocks/ERC20Mock.sol";
 import { StreamFactory } from "../src/StreamFactory.sol";
 import { Stream } from "../src/Stream.sol";
 import { IStream } from "../src/IStream.sol";
+import { LibClone } from "solady/utils/LibClone.sol";
 
 contract StreamFactoryTest is Test {
     event StreamCreated(
@@ -26,7 +27,7 @@ contract StreamFactoryTest is Test {
     ERC20Mock token;
 
     function setUp() public {
-        token = new ERC20Mock("mock-token", "MOK", address(1), 0);
+        token = new ERC20Mock("Mock Token", "MOCK", address(1), 0);
 
         Stream streamImplementation = new Stream();
         factory = new StreamFactory(address(streamImplementation));
@@ -206,7 +207,7 @@ contract StreamFactoryTest is Test {
 
         factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
 
-        vm.expectRevert("ERC1167: create2 failed");
+        vm.expectRevert(abi.encodeWithSelector(LibClone.DeploymentFailed.selector));
         factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
     }
 
@@ -242,5 +243,71 @@ contract StreamFactoryTest is Test {
                 payer, recipient, tokenAmount, address(token), startTime, stopTime, 1
             )
         );
+    }
+}
+
+contract StreamFactoryCreatesCorrectStreamTest is Test {
+    uint256 constant DURATION = 1000;
+    uint256 constant STREAM_AMOUNT = 2000;
+
+    StreamFactory factory;
+    ERC20Mock token;
+
+    address payer = address(0x1000);
+    address recipient = address(0x1001);
+    uint256 startTime;
+    uint256 stopTime;
+
+    function setUp() public {
+        token = new ERC20Mock("mock-token", "MOK", address(1), 0);
+        factory = new StreamFactory(address(new Stream()));
+
+        startTime = block.timestamp;
+        stopTime = startTime + DURATION;
+    }
+
+    function test_createStream_revertsWhenPayerIsAddressZero() public {
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.PayerIsAddressZero.selector));
+        factory.createStream(
+            address(0), recipient, STREAM_AMOUNT, address(token), startTime, stopTime
+        );
+    }
+
+    function test_createStream_revertsWhenRecipientIsAddressZero() public {
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.RecipientIsAddressZero.selector));
+
+        factory.createStream(payer, address(0), STREAM_AMOUNT, address(token), startTime, stopTime);
+    }
+
+    function test_createStream_revertsWhenTokenAmountIsZero() public {
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.TokenAmountIsZero.selector));
+        factory.createStream(payer, recipient, 0, address(token), startTime, stopTime);
+    }
+
+    function test_createStream_revertsWhenDurationIsNotPositive() public {
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.DurationMustBePositive.selector));
+        factory.createStream(payer, recipient, STREAM_AMOUNT, address(token), startTime, startTime);
+    }
+
+    function test_createStream_revertsWhenAmountLessThanDuration() public {
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.TokenAmountLessThanDuration.selector));
+        factory.createStream(payer, recipient, DURATION - 1, address(token), startTime, stopTime);
+    }
+
+    function test_createStream_savesStreamParameters() public {
+        Stream s = Stream(
+            factory.createStream(
+                payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime
+            )
+        );
+
+        assertEq(s.tokenAmount(), STREAM_AMOUNT);
+        assertEq(s.ratePerSecond(), 2 * s.RATE_DECIMALS_MULTIPLIER());
+        assertEq(s.startTime(), startTime);
+        assertEq(s.stopTime(), stopTime);
+        assertEq(s.recipient(), recipient);
+        assertEq(s.payer(), payer);
+        assertEq(address(s.token()), address(token));
+        assertEq(s.remainingBalance(), STREAM_AMOUNT);
     }
 }
