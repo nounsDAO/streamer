@@ -422,6 +422,32 @@ contract StreamCancelTest is StreamTest {
         assertEq(token.balanceOf(payer), expectedPayerBalance);
         assertEq(token.balanceOf(recipient), expectedRecipientBalance);
     }
+
+    function test_cancel_onceCancelledRecipientCantWithdrawFutureTokensAccidentallySent() public {
+        vm.prank(payer);
+        s.cancel();
+
+        vm.warp(stopTime);
+        token.mint(address(s), 1);
+
+        vm.prank(recipient);
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        s.withdraw(1);
+    }
+
+    function test_cancel_onceCancelledRecipientCantCancelToGetFutureTokensAccidentallySent()
+        public
+    {
+        vm.prank(payer);
+        s.cancel();
+
+        vm.warp(stopTime);
+        token.mint(address(s), STREAM_AMOUNT);
+
+        vm.prank(recipient);
+        s.cancel();
+        assertEq(token.balanceOf(recipient), 0);
+    }
 }
 
 contract StreamTokenAndOutstandingBalanceTest is StreamTest {

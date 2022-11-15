@@ -164,6 +164,12 @@ contract Stream is IStream, Initializable, ReentrancyGuard {
         IERC20 token = IERC20(tokenAddress);
 
         uint256 recipientBalance = balanceOf(recipient_);
+
+        // This zeroing is important because without it, it's possible for recipient to obtain additional funds
+        // from this contract if anyone (e.g. payer) sends it tokens after cancellation.
+        // Thanks to this state update, `balanceOf(recipient_)` will only return zero in future calls.
+        remainingBalance = 0;
+
         if (recipientBalance > 0) token.safeTransfer(recipient_, recipientBalance);
 
         uint256 payerBalance = tokenBalance();
