@@ -187,7 +187,7 @@ contract Stream is IStream, Clone, ReentrancyGuard {
      * Only this stream's payer or recipient can call this function.
      * @param amount the amount of tokens to withdraw.
      */
-    function withdraw(uint256 amount) external nonReentrant onlyPayerOrRecipient {
+    function withdraw(uint256 amount) external onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
 

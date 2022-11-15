@@ -7,6 +7,7 @@ import { ERC20Mock } from "openzeppelin-contracts/mocks/ERC20Mock.sol";
 import { StreamFactory } from "../src/StreamFactory.sol";
 import { Stream } from "../src/Stream.sol";
 import { IStream } from "../src/IStream.sol";
+import { ReentranceToken, ReentranceRecipient } from "./helpers/Reentrance.sol";
 
 contract StreamTest is Test {
     uint256 constant DURATION = 1000;
@@ -157,6 +158,25 @@ contract StreamWithdrawTest is StreamTest {
         s.withdraw((STREAM_AMOUNT / 2) - withdrawnAmount);
 
         vm.stopPrank();
+    }
+
+    function test_withdraw_preventsReentry() public {
+        ReentranceToken rToken = new ReentranceToken("Reentrance Token", "RT", address(1), 0);
+        ReentranceRecipient rRecipient = new ReentranceRecipient();
+
+        s = Stream(
+            factory.createStream(
+                payer, address(rRecipient), STREAM_AMOUNT, address(rToken), startTime, stopTime
+            )
+        );
+        rToken.mint(address(s), STREAM_AMOUNT);
+        rToken.setStream(s);
+
+        vm.warp(startTime + (DURATION / 2));
+
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        vm.prank(address(rRecipient));
+        s.withdraw(STREAM_AMOUNT / 2);
     }
 }
 
