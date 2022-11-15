@@ -156,4 +156,45 @@ contract StreamFactoryTest is Test {
             honestSender, recipient, tokenAmount, address(token), startTime, stopTime
         );
     }
+
+    function test_createAndFundStream_revertsWhenTokenApprovalIsInsufficent() public {
+        uint256 tokenAmount = 1234;
+        uint256 startTime = 1;
+        uint256 stopTime = 1001;
+
+        vm.expectRevert("ERC20: insufficient allowance");
+        factory.createAndFundStream(recipient, tokenAmount, address(token), startTime, stopTime);
+    }
+
+    function test_createAndFundStream_revertsWhenPayerHasInsufficientFunds() public {
+        uint256 tokenAmount = 1234;
+        uint256 startTime = 1;
+        uint256 stopTime = 1001;
+        token.approve(address(factory), tokenAmount);
+
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        factory.createAndFundStream(recipient, tokenAmount, address(token), startTime, stopTime);
+    }
+
+    function test_createAndFundStream_createsWorkingStreamGivenSufficientTokenApproval() public {
+        uint256 tokenAmount = 1234;
+        uint256 startTime = block.timestamp;
+        uint256 stopTime = block.timestamp + 1000;
+        token.approve(address(factory), tokenAmount);
+        token.mint(address(this), tokenAmount);
+
+        IStream stream = IStream(
+            factory.createAndFundStream(recipient, tokenAmount, address(token), startTime, stopTime)
+        );
+
+        assertEq(token.balanceOf(address(stream)), tokenAmount);
+        assertEq(token.balanceOf(recipient), 0);
+
+        vm.warp(stopTime);
+        vm.prank(recipient);
+        stream.withdraw(tokenAmount);
+
+        assertEq(token.balanceOf(address(stream)), 0);
+        assertEq(token.balanceOf(recipient), tokenAmount);
+    }
 }
