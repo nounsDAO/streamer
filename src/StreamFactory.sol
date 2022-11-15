@@ -43,6 +43,12 @@ contract StreamFactory {
     }
 
     /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   EXTERNAL TXS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
+
+    /**
      * @notice Create a new stream contract instance.
      * The payer is assumed to be `msg.sender`.
      * @param recipient the recipient of the stream.
@@ -103,16 +109,49 @@ contract StreamFactory {
         uint256 startTime,
         uint256 stopTime
     ) public returns (address stream) {
-        bytes32 salt = keccak256(
-            abi.encodePacked(
-                msg.sender, payer, recipient, tokenAmount, tokenAddress, startTime, stopTime
+        return createStream(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0);
+    }
+
+    /**
+     * @notice Create a new stream contract instance.
+     * This version allows you to specify an additional `nonce` in case payer wants to create multiple streams
+     * with the same parameters. In all other versions nonce is zero.
+     * @dev The added nonce helps payer avoid stream contract address collisions among streams where all other
+     * parameters are identical.
+     * @param payer the account responsible for funding the stream.
+     * @param recipient the recipient of the stream.
+     * @param tokenAmount the total token amount payer is streaming to recipient.
+     * @param tokenAddress the contract address of the payment token.
+     * @param startTime the stream start timestamp in seconds.
+     * @param stopTime the stream end timestamp in seconds.
+     * @param nonce the nonce for this stream creation.
+     * @return stream the address of the new stream contract.
+     */
+    function createStream(
+        address payer,
+        address recipient,
+        uint256 tokenAmount,
+        address tokenAddress,
+        uint256 startTime,
+        uint256 stopTime,
+        uint8 nonce
+    ) public returns (address stream) {
+        stream = Clones.cloneDeterministic(
+            streamImplementation,
+            salt(
+                msg.sender, payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, nonce
             )
         );
-        stream = Clones.cloneDeterministic(streamImplementation, salt);
         IStream(stream).initialize(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
 
         emit StreamCreated(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, stream);
     }
+
+    /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   VIEW FUNCTIONS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
 
     /**
      * @notice Get the expected contract address of a stream created with the provided parameters.
@@ -126,11 +165,52 @@ contract StreamFactory {
         uint256 startTime,
         uint256 stopTime
     ) public view returns (address) {
-        bytes32 salt = keccak256(
+        return predictStreamAddress(
+            msgSender, payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0
+        );
+    }
+
+    /**
+     * @notice Get the expected contract address of a stream created with the provided parameters.
+     * Use this version when creating streams with a non-zero `nonce`. Should only be used on the rare occasion
+     * when a payer wants to create multiple streams with identical parameters.
+     */
+    function predictStreamAddress(
+        address msgSender,
+        address payer,
+        address recipient,
+        uint256 tokenAmount,
+        address tokenAddress,
+        uint256 startTime,
+        uint256 stopTime,
+        uint8 nonce
+    ) public view returns (address) {
+        return Clones.predictDeterministicAddress(
+            streamImplementation,
+            salt(msgSender, payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, nonce)
+        );
+    }
+
+    /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   INTERNAL FUNCTIONS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
+
+    function salt(
+        address msgSender,
+        address payer,
+        address recipient,
+        uint256 tokenAmount,
+        address tokenAddress,
+        uint256 startTime,
+        uint256 stopTime,
+        uint8 nonce
+    ) internal pure returns (bytes32) {
+        return keccak256(
             abi.encodePacked(
-                msgSender, payer, recipient, tokenAmount, tokenAddress, startTime, stopTime
+                msgSender, payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, nonce
             )
         );
-        return Clones.predictDeterministicAddress(streamImplementation, salt);
     }
 }

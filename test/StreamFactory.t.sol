@@ -197,4 +197,50 @@ contract StreamFactoryTest is Test {
         assertEq(token.balanceOf(address(stream)), 0);
         assertEq(token.balanceOf(recipient), tokenAmount);
     }
+
+    function test_createStream_withoutNonceTwoStreamsWithSameParamtersRevertsOnSecondStreamCreation(
+    ) public {
+        uint256 startTime = block.timestamp;
+        uint256 stopTime = startTime + 1000;
+        uint256 tokenAmount = 1000;
+
+        factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
+
+        vm.expectRevert("ERC1167: create2 failed");
+        factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
+    }
+
+    function test_createStream_usingNonceCanCreateTwoStreamsWithSameParamters() public {
+        uint256 startTime = block.timestamp;
+        uint256 stopTime = startTime + 1000;
+        uint256 tokenAmount = 1000;
+
+        factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime, 0);
+
+        factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime, 1);
+    }
+
+    function test_predictStreamAddress_predictsCorrectlyWithNonce() public {
+        uint256 startTime = block.timestamp;
+        uint256 stopTime = startTime + 1000;
+        uint256 tokenAmount = 1000;
+
+        assertEq(
+            factory.predictStreamAddress(
+                address(this), payer, recipient, tokenAmount, address(token), startTime, stopTime, 0
+            ),
+            factory.createStream(
+                payer, recipient, tokenAmount, address(token), startTime, stopTime, 0
+            )
+        );
+
+        assertEq(
+            factory.predictStreamAddress(
+                address(this), payer, recipient, tokenAmount, address(token), startTime, stopTime, 1
+            ),
+            factory.createStream(
+                payer, recipient, tokenAmount, address(token), startTime, stopTime, 1
+            )
+        );
+    }
 }
