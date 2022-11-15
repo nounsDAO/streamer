@@ -160,7 +160,7 @@ contract StreamWithdrawTest is StreamTest {
         vm.stopPrank();
     }
 
-    function test_withdraw_preventsReentry() public {
+    function test_withdraw_preventsReentryToWithdraw() public {
         ReentranceToken rToken = new ReentranceToken("Reentrance Token", "RT", address(1), 0);
         ReentranceRecipient rRecipient = new ReentranceRecipient();
 
@@ -177,6 +177,29 @@ contract StreamWithdrawTest is StreamTest {
         vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
         vm.prank(address(rRecipient));
         s.withdraw(STREAM_AMOUNT / 2);
+    }
+
+    function test_withdraw_reentryToCancelDoesNotBenefitRecipient() public {
+        ReentranceToken rToken = new ReentranceToken("Reentrance Token", "RT", address(1), 0);
+        ReentranceRecipient rRecipient = new ReentranceRecipient();
+        rRecipient.setReenterCancel(true);
+        s = Stream(
+            factory.createStream(
+                payer, address(rRecipient), STREAM_AMOUNT, address(rToken), startTime, stopTime
+            )
+        );
+        rToken.mint(address(s), STREAM_AMOUNT);
+        rToken.setStream(s);
+        vm.warp(startTime + (DURATION / 2));
+
+        vm.expectEmit(true, true, true, true);
+        emit StreamCancelled(payer, address(rRecipient), STREAM_AMOUNT / 2, 0);
+
+        vm.prank(address(rRecipient));
+        s.withdraw(STREAM_AMOUNT / 2);
+
+        assertEq(rToken.balanceOf(address(rRecipient)), STREAM_AMOUNT / 2);
+        assertEq(rToken.balanceOf(payer), STREAM_AMOUNT / 2);
     }
 }
 
@@ -441,6 +464,51 @@ contract StreamCancelTest is StreamTest {
         vm.prank(recipient);
         s.cancel();
         assertEq(token.balanceOf(recipient), 0);
+    }
+
+    function test_cancel_preventsReentryToWithdraw() public {
+        ReentranceToken rToken = new ReentranceToken("Reentrance Token", "RT", address(1), 0);
+        ReentranceRecipient rRecipient = new ReentranceRecipient();
+
+        s = Stream(
+            factory.createStream(
+                payer, address(rRecipient), STREAM_AMOUNT, address(rToken), startTime, stopTime
+            )
+        );
+        rToken.mint(address(s), STREAM_AMOUNT);
+        rToken.setStream(s);
+
+        vm.warp(startTime + (DURATION / 2));
+
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        vm.prank(address(rRecipient));
+        s.cancel();
+    }
+
+    function test_cancel_reentryToCancelDoesNotBenefitRecipient() public {
+        ReentranceToken rToken = new ReentranceToken("Reentrance Token", "RT", address(1), 0);
+        ReentranceRecipient rRecipient = new ReentranceRecipient();
+        rRecipient.setReenterCancel(true);
+        s = Stream(
+            factory.createStream(
+                payer, address(rRecipient), STREAM_AMOUNT, address(rToken), startTime, stopTime
+            )
+        );
+        rToken.mint(address(s), STREAM_AMOUNT);
+        rToken.setStream(s);
+
+        vm.warp(startTime + (DURATION / 2));
+
+        vm.expectEmit(true, true, true, true);
+        // The first event is from the reentry, when recipient's balance is zero, and payer's balance is still
+        // half the stream's value.
+        // The second event is from the origial call as it resumes, when the recipient's balance was 1000, while the
+        // payer's balance is checked after, when it's already zero.
+        emit StreamCancelled(payer, address(rRecipient), STREAM_AMOUNT / 2, 0);
+        emit StreamCancelled(payer, address(rRecipient), 0, STREAM_AMOUNT / 2);
+
+        vm.prank(address(rRecipient));
+        s.cancel();
     }
 }
 

@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.17;
 
-import { ReentrancyGuard } from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
@@ -16,7 +15,7 @@ import { Clone } from "solady/utils/Clone.sol";
  * Either party can choose to cancel, in which case the stream distributes each party's fair share of tokens.
  * @dev A fork of Sablier https://github.com/sablierhq/sablier/blob/%40sablier/protocol%401.1.0/packages/protocol/contracts/Sablier.sol
  */
-contract Stream is IStream, Clone, ReentrancyGuard {
+contract Stream is IStream, Clone {
     using SafeERC20 for IERC20;
 
     /**
@@ -207,7 +206,7 @@ contract Stream is IStream, Clone, ReentrancyGuard {
      * hadn't fully funded the stream.
      * Only this stream's payer or recipient can call this function.
      */
-    function cancel() external nonReentrant onlyPayerOrRecipient {
+    function cancel() external onlyPayerOrRecipient {
         address payer_ = payer();
         address recipient_ = recipient();
         IERC20 token_ = token();
@@ -296,6 +295,10 @@ contract Stream is IStream, Clone, ReentrancyGuard {
         }
 
         uint256 remainingBalance_ = remainingBalance;
+
+        // When this function is called after the stream has been cancelled, when balance is less than
+        // tokenAmount, without this early exit, the withdrawal calculation below results in an underflow error.
+        if (remainingBalance_ == 0) return 0;
 
         // Take withdrawals into account
         if (tokenAmount_ > remainingBalance_) {

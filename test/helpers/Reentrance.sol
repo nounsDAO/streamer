@@ -7,12 +7,21 @@ import { Stream } from "../../src/Stream.sol";
 
 contract ReentranceRecipient {
     bool public attemptedReentry;
+    bool public reenterCancel;
 
     function afterTransfer(Stream stream, uint256 amount) public {
         if (!attemptedReentry) {
             attemptedReentry = true;
-            stream.withdraw(amount);
+            if (reenterCancel) {
+                stream.cancel();
+            } else {
+                stream.withdraw(amount);
+            }
         }
+    }
+
+    function setReenterCancel(bool _reenterCancel) public {
+        reenterCancel = _reenterCancel;
     }
 }
 
