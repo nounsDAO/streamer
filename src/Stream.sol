@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.17;
 
-import { Initializable } from "openzeppelin-contracts/proxy/utils/Initializable.sol";
 import { ReentrancyGuard } from "openzeppelin-contracts/security/ReentrancyGuard.sol";
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
@@ -17,7 +16,7 @@ import { Clone } from "solady/utils/Clone.sol";
  * Either party can choose to cancel, in which case the stream distributes each party's fair share of tokens.
  * @dev A fork of Sablier https://github.com/sablierhq/sablier/blob/%40sablier/protocol%401.1.0/packages/protocol/contracts/Sablier.sol
  */
-contract Stream is IStream, Clone, Initializable, ReentrancyGuard {
+contract Stream is IStream, Clone, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /**
@@ -26,6 +25,7 @@ contract Stream is IStream, Clone, Initializable, ReentrancyGuard {
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
+    error OnlyFactory();
     error CantWithdrawZero();
     error AmountExceedsBalance();
     error CallerNotPayerOrRecipient();
@@ -54,11 +54,19 @@ contract Stream is IStream, Clone, Initializable, ReentrancyGuard {
     uint256 public constant RATE_DECIMALS_MULTIPLIER = 1e6;
 
     /**
+     * @notice Get the address of the factory contract that cloned this Stream instance.
+     * @dev Uses clone-with-immutable-args to read the value from the contract's code region rather than state to save gas.
+     */
+    function factory() public pure returns (address) {
+        return _getArgAddress(0);
+    }
+
+    /**
      * @notice Get this stream's payer address.
      * @dev Uses clone-with-immutable-args to read the value from the contract's code region rather than state to save gas.
      */
     function payer() public pure returns (address) {
-        return _getArgAddress(0);
+        return _getArgAddress(20);
     }
 
     /**
@@ -66,7 +74,7 @@ contract Stream is IStream, Clone, Initializable, ReentrancyGuard {
      * @dev Uses clone-with-immutable-args to read the value from the contract's code region rather than state to save gas.
      */
     function recipient() public pure returns (address) {
-        return _getArgAddress(20);
+        return _getArgAddress(40);
     }
 
     /**
@@ -74,7 +82,7 @@ contract Stream is IStream, Clone, Initializable, ReentrancyGuard {
      * @dev Uses clone-with-immutable-args to read the value from the contract's code region rather than state to save gas.
      */
     function tokenAmount() public pure returns (uint256) {
-        return _getArgUint256(40);
+        return _getArgUint256(60);
     }
 
     /**
@@ -82,7 +90,7 @@ contract Stream is IStream, Clone, Initializable, ReentrancyGuard {
      * @dev Uses clone-with-immutable-args to read the value from the contract's code region rather than state to save gas.
      */
     function token() public pure returns (IERC20) {
-        return IERC20(_getArgAddress(72));
+        return IERC20(_getArgAddress(92));
     }
 
     /**
@@ -90,7 +98,7 @@ contract Stream is IStream, Clone, Initializable, ReentrancyGuard {
      * @dev Uses clone-with-immutable-args to read the value from the contract's code region rather than state to save gas.
      */
     function startTime() public pure returns (uint256) {
-        return _getArgUint256(92);
+        return _getArgUint256(112);
     }
 
     /**
@@ -98,7 +106,7 @@ contract Stream is IStream, Clone, Initializable, ReentrancyGuard {
      * @dev Uses clone-with-immutable-args to read the value from the contract's code region rather than state to save gas.
      */
     function stopTime() public pure returns (uint256) {
-        return _getArgUint256(124);
+        return _getArgUint256(144);
     }
 
     /**
@@ -155,7 +163,15 @@ contract Stream is IStream, Clone, Initializable, ReentrancyGuard {
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
-    function initialize() public initializer {
+    /**
+     * @dev Limiting calls to factory only to prevent abuse. This approach is more gas efficient than using
+     * OpenZeppelin's Initializable since we avoid the storage writes that entails.
+     * This does create the possibility for the factory to initialize the same stream twice; this risk seems low
+     * and worth the gas savings.
+     */
+    function initialize() public {
+        if (msg.sender != factory()) revert OnlyFactory();
+
         remainingBalance = tokenAmount();
     }
 

@@ -44,14 +44,14 @@ contract StreamInitializeTest is StreamTest {
         super.setUp();
     }
 
-    function test_initialize_revertsWhenCalledTwice() public {
+    function test_initialize_revertsWhenCalledNotByFactory() public {
         s = Stream(
             factory.createStream(
                 payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime
             )
         );
 
-        vm.expectRevert("Initializable: contract is already initialized");
+        vm.expectRevert(abi.encodeWithSelector(Stream.OnlyFactory.selector));
         s.initialize();
     }
 }

@@ -224,8 +224,10 @@ contract StreamFactory {
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
-    ) internal pure returns (bytes memory) {
-        return abi.encodePacked(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime);
+    ) internal view returns (bytes memory) {
+        return abi.encodePacked(
+            address(this), payer, recipient, tokenAmount, tokenAddress, startTime, stopTime
+        );
     }
 
     function salt(
