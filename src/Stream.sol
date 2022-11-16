@@ -36,9 +36,12 @@ contract Stream is IStream, Clone {
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
-    event TokensWithdrawn(address indexed recipient, uint256 amount);
+    /// @dev msgSender is part of the event to enable event indexing with which account performed this action.
+    event TokensWithdrawn(address indexed msgSender, address indexed recipient, uint256 amount);
 
+    /// @dev msgSender is part of the event to enable event indexing with which account performed this action.
     event StreamCancelled(
+        address indexed msgSender,
         address indexed payer,
         address indexed recipient,
         uint256 payerBalance,
@@ -137,7 +140,8 @@ contract Stream is IStream, Clone {
      */
 
     /**
-     * @notice the maximum token balance remaining in the stream when taking withdrawals into account.
+     * @notice The maximum token balance remaining in the stream when taking withdrawals into account.
+     * Should be equal to the stream's token balance once fully funded.
      * @dev using remaining balance rather than a growing sum of withdrawals for gas optimization reasons.
      * This approach warms up this slot upon stream creation, so that withdrawals cost less gas.
      * If this were the sum of withdrawals, recipient would pay 20K extra gas on their first withdrawal.
@@ -173,7 +177,7 @@ contract Stream is IStream, Clone {
      * This does create the possibility for the factory to initialize the same stream twice; this risk seems low
      * and worth the gas savings.
      */
-    function initialize() public {
+    function initialize() external {
         if (msg.sender != factory()) revert OnlyFactory();
 
         remainingBalance = tokenAmount();
@@ -201,7 +205,7 @@ contract Stream is IStream, Clone {
         remainingBalance = remainingBalance - amount;
 
         token().safeTransfer(recipient_, amount);
-        emit TokensWithdrawn(recipient_, amount);
+        emit TokensWithdrawn(msg.sender, recipient_, amount);
     }
 
     /**
@@ -232,7 +236,7 @@ contract Stream is IStream, Clone {
             token_.safeTransfer(payer_, payerBalance);
         }
 
-        emit StreamCancelled(payer_, recipient_, payerBalance, recipientBalance);
+        emit StreamCancelled(msg.sender, payer_, recipient_, payerBalance, recipientBalance);
     }
 
     /**

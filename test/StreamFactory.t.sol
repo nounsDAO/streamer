@@ -11,6 +11,7 @@ import { LibClone } from "solady/utils/LibClone.sol";
 
 contract StreamFactoryTest is Test {
     event StreamCreated(
+        address indexed msgSender,
         address indexed payer,
         address indexed recipient,
         uint256 tokenAmount,
@@ -93,7 +94,14 @@ contract StreamFactoryTest is Test {
 
         vm.expectEmit(true, true, true, true);
         emit StreamCreated(
-            payer, recipient, tokenAmount, address(token), startTime, stopTime, predictedStream
+            address(this),
+            payer,
+            recipient,
+            tokenAmount,
+            address(token),
+            startTime,
+            stopTime,
+            predictedStream
             );
         address newStream =
             factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
@@ -126,6 +134,7 @@ contract StreamFactoryTest is Test {
         );
         vm.expectEmit(true, true, true, true);
         emit StreamCreated(
+            frontrunner,
             honestSender,
             recipient,
             tokenAmount,
@@ -144,6 +153,7 @@ contract StreamFactoryTest is Test {
         );
         vm.expectEmit(true, true, true, true);
         emit StreamCreated(
+            honestSender,
             honestSender,
             recipient,
             tokenAmount,
