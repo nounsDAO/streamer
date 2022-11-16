@@ -14,12 +14,12 @@ For example, Nouns DAO can use [Token Buyer](https://github.com/nounsDAO/token-b
 
 ## Contracts
 
-- StreamFactory
+- [StreamFactory](https://github.com/nounsDAO/streamer/blob/master/src/StreamFactory.sol)
 
   - Creates new Streams using minimal clones
   - Supports predicting new Stream contract addresses, making it easier to compose DAO proposals, since a proposal author can know the address of the Stream the proposal will create before it's created
 
-- Stream
+- [Stream](https://github.com/nounsDAO/streamer/blob/master/src/Stream.sol)
 
   - Supports custom start and end timestamps
   - Does not enforce upfront funding, making it usable for DAOs and other payers that acquire payment tokens post Stream creation
