@@ -10,6 +10,10 @@ import { LibClone } from "solady/utils/LibClone.sol";
 /**
  * @title Stream Factory
  * @notice Creates minimal clones of `Stream`.
+ * The cloning approach enables delayed funding of streams, which is useful for payers who acquire tokens for streams
+ * asynchronously, e.g. by using https://github.com/nounsDAO/token-buyer.
+ * Each stream in its own contract is better than multiple streams in one contract, in the case of delayed funding
+ * because it avoid the problem of recipients competing for the same funds.
  * @dev Uses `LibClone` which creates clones with immutable arguments written into the clone's code section; this
  * approach provides significant gas savings.
  */
@@ -51,10 +55,14 @@ contract StreamFactory {
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
-    address immutable streamImplementation;
+    /// @notice The address of the Stream implementation to use when creating Stream clones.
+    address public immutable streamImplementation;
 
-    constructor(address streamImplementation_) {
-        streamImplementation = streamImplementation_;
+    /**
+     * @param _streamImplementation the address of the Stream implementation to use when creating Stream clones.
+     */
+    constructor(address _streamImplementation) {
+        streamImplementation = _streamImplementation;
     }
 
     /**
@@ -70,8 +78,8 @@ contract StreamFactory {
      * @param tokenAmount the total token amount payer is streaming to recipient.
      * @param tokenAddress the contract address of the payment token.
      * @param startTime the stream start timestamp in seconds.
-     * @param stopTime the stream end timestamp in seconds.
-     * @return stream the address of the new stream contract.
+     * @param startTime the unix timestamp for when the stream starts.
+     * @param stopTime the unix timestamp for when the stream ends.
      */
     function createStream(
         address recipient,
@@ -79,8 +87,10 @@ contract StreamFactory {
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
-    ) public returns (address stream) {
-        return createStream(msg.sender, recipient, tokenAmount, tokenAddress, startTime, stopTime);
+    ) public returns (address) {
+        return createStream(
+            msg.sender, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0
+        );
     }
 
     /**
@@ -91,8 +101,8 @@ contract StreamFactory {
      * @param recipient the recipient of the stream.
      * @param tokenAmount the total token amount payer is streaming to recipient.
      * @param tokenAddress the contract address of the payment token.
-     * @param startTime the stream start timestamp in seconds.
-     * @param stopTime the stream end timestamp in seconds.
+     * @param startTime the unix timestamp for when the stream starts.
+     * @param stopTime the unix timestamp for when the stream ends.
      * @return stream the address of the new stream contract.
      */
     function createAndFundStream(
@@ -102,7 +112,8 @@ contract StreamFactory {
         uint256 startTime,
         uint256 stopTime
     ) public returns (address stream) {
-        stream = createStream(recipient, tokenAmount, tokenAddress, startTime, stopTime);
+        stream =
+            createStream(msg.sender, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0);
         IERC20(tokenAddress).safeTransferFrom(msg.sender, stream, tokenAmount);
     }
 
@@ -112,8 +123,8 @@ contract StreamFactory {
      * @param recipient the recipient of the stream.
      * @param tokenAmount the total token amount payer is streaming to recipient.
      * @param tokenAddress the contract address of the payment token.
-     * @param startTime the stream start timestamp in seconds.
-     * @param stopTime the stream end timestamp in seconds.
+     * @param startTime the unix timestamp for when the stream starts.
+     * @param stopTime the unix timestamp for when the stream ends.
      * @return stream the address of the new stream contract.
      */
     function createStream(
@@ -123,7 +134,7 @@ contract StreamFactory {
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
-    ) public returns (address stream) {
+    ) public returns (address) {
         return createStream(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0);
     }
 
@@ -137,8 +148,8 @@ contract StreamFactory {
      * @param recipient the recipient of the stream.
      * @param tokenAmount the total token amount payer is streaming to recipient.
      * @param tokenAddress the contract address of the payment token.
-     * @param startTime the stream start timestamp in seconds.
-     * @param stopTime the stream end timestamp in seconds.
+     * @param startTime the unix timestamp for when the stream starts.
+     * @param stopTime the unix timestamp for when the stream ends.
      * @param nonce the nonce for this stream creation.
      * @return stream the address of the new stream contract.
      */
@@ -184,8 +195,8 @@ contract StreamFactory {
      * @param recipient the recipient of the stream.
      * @param tokenAmount the total token amount payer is streaming to recipient.
      * @param tokenAddress the contract address of the payment token.
-     * @param startTime the stream start timestamp in seconds.
-     * @param stopTime the stream end timestamp in seconds.
+     * @param startTime the unix timestamp for when the stream starts.
+     * @param stopTime the unix timestamp for when the stream ends.
      */
     function predictStreamAddress(
         address msgSender,
@@ -210,8 +221,8 @@ contract StreamFactory {
      * @param recipient the recipient of the stream.
      * @param tokenAmount the total token amount payer is streaming to recipient.
      * @param tokenAddress the contract address of the payment token.
-     * @param startTime the stream start timestamp in seconds.
-     * @param stopTime the stream end timestamp in seconds.
+     * @param startTime the unix timestamp for when the stream starts.
+     * @param stopTime the unix timestamp for when the stream ends.
      * @param nonce the nonce for this stream creation.
      */
     function predictStreamAddress(
