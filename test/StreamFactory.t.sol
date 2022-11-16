@@ -7,6 +7,7 @@ import { ERC20Mock } from "openzeppelin-contracts/mocks/ERC20Mock.sol";
 import { StreamFactory } from "../src/StreamFactory.sol";
 import { Stream } from "../src/Stream.sol";
 import { IStream } from "../src/IStream.sol";
+import { LibClone } from "solady/utils/LibClone.sol";
 
 contract StreamFactoryTest is Test {
     event StreamCreated(
@@ -21,11 +22,12 @@ contract StreamFactoryTest is Test {
 
     StreamFactory factory;
 
+    address payer = address(0x1000);
     address recipient = address(0x1001);
     ERC20Mock token;
 
     function setUp() public {
-        token = new ERC20Mock("mock-token", "MOK", address(1), 0);
+        token = new ERC20Mock("Mock Token", "MOCK", address(1), 0);
 
         Stream streamImplementation = new Stream();
         factory = new StreamFactory(address(streamImplementation));
@@ -60,14 +62,17 @@ contract StreamFactoryTest is Test {
         uint256 startTime = 1640988000; // 2022-01-01 00:00:00
         uint256 stopTime = 1672524000; // 2023-01-01 00:00:00
         uint256 tokenAmount = 999975024000; // ~1M * 1e6
+        token.mint(payer, tokenAmount);
 
         address predictedAddress = factory.predictStreamAddress(
-            address(this), recipient, tokenAmount, address(token), startTime, stopTime
+            payer, payer, recipient, tokenAmount, address(token), startTime, stopTime
         );
 
         // Proposal would do these txs
-        factory.createStream(recipient, tokenAmount, address(token), startTime, stopTime);
-        token.mint(predictedAddress, tokenAmount);
+        vm.startPrank(payer);
+        factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
+        token.transfer(predictedAddress, tokenAmount);
+        vm.stopPrank();
         // End proposal
 
         vm.warp(startTime + 30 days);
@@ -82,9 +87,8 @@ contract StreamFactoryTest is Test {
         uint256 startTime = 1640988000;
         uint256 stopTime = 1672524000;
         uint256 tokenAmount = 999975024000;
-        address payer = address(0x4242);
         address predictedStream = factory.predictStreamAddress(
-            address(this), recipient, tokenAmount, address(token), startTime, stopTime
+            address(this), payer, recipient, tokenAmount, address(token), startTime, stopTime
         );
 
         vm.expectEmit(true, true, true, true);
@@ -118,7 +122,7 @@ contract StreamFactoryTest is Test {
         address frontrunner = address(0x1234);
 
         address predictedStream = factory.predictStreamAddress(
-            frontrunner, recipient, tokenAmount, address(token), startTime, stopTime
+            frontrunner, honestSender, recipient, tokenAmount, address(token), startTime, stopTime
         );
         vm.expectEmit(true, true, true, true);
         emit StreamCreated(
@@ -136,7 +140,7 @@ contract StreamFactoryTest is Test {
         );
 
         predictedStream = factory.predictStreamAddress(
-            honestSender, recipient, tokenAmount, address(token), startTime, stopTime
+            honestSender, honestSender, recipient, tokenAmount, address(token), startTime, stopTime
         );
         vm.expectEmit(true, true, true, true);
         emit StreamCreated(
@@ -152,5 +156,158 @@ contract StreamFactoryTest is Test {
         factory.createStream(
             honestSender, recipient, tokenAmount, address(token), startTime, stopTime
         );
+    }
+
+    function test_createAndFundStream_revertsWhenTokenApprovalIsInsufficent() public {
+        uint256 tokenAmount = 1234;
+        uint256 startTime = 1;
+        uint256 stopTime = 1001;
+
+        vm.expectRevert("ERC20: insufficient allowance");
+        factory.createAndFundStream(recipient, tokenAmount, address(token), startTime, stopTime);
+    }
+
+    function test_createAndFundStream_revertsWhenPayerHasInsufficientFunds() public {
+        uint256 tokenAmount = 1234;
+        uint256 startTime = 1;
+        uint256 stopTime = 1001;
+        token.approve(address(factory), tokenAmount);
+
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        factory.createAndFundStream(recipient, tokenAmount, address(token), startTime, stopTime);
+    }
+
+    function test_createAndFundStream_createsWorkingStreamGivenSufficientTokenApproval() public {
+        uint256 tokenAmount = 1234;
+        uint256 startTime = block.timestamp;
+        uint256 stopTime = block.timestamp + 1000;
+        token.approve(address(factory), tokenAmount);
+        token.mint(address(this), tokenAmount);
+
+        IStream stream = IStream(
+            factory.createAndFundStream(recipient, tokenAmount, address(token), startTime, stopTime)
+        );
+
+        assertEq(token.balanceOf(address(stream)), tokenAmount);
+        assertEq(token.balanceOf(recipient), 0);
+
+        vm.warp(stopTime);
+        vm.prank(recipient);
+        stream.withdraw(tokenAmount);
+
+        assertEq(token.balanceOf(address(stream)), 0);
+        assertEq(token.balanceOf(recipient), tokenAmount);
+    }
+
+    function test_createStream_withoutNonceTwoStreamsWithSameParamtersRevertsOnSecondStreamCreation(
+    ) public {
+        uint256 startTime = block.timestamp;
+        uint256 stopTime = startTime + 1000;
+        uint256 tokenAmount = 1000;
+
+        factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
+
+        vm.expectRevert(abi.encodeWithSelector(LibClone.DeploymentFailed.selector));
+        factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime);
+    }
+
+    function test_createStream_usingNonceCanCreateTwoStreamsWithSameParamters() public {
+        uint256 startTime = block.timestamp;
+        uint256 stopTime = startTime + 1000;
+        uint256 tokenAmount = 1000;
+
+        factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime, 0);
+
+        factory.createStream(payer, recipient, tokenAmount, address(token), startTime, stopTime, 1);
+    }
+
+    function test_predictStreamAddress_predictsCorrectlyWithNonce() public {
+        uint256 startTime = block.timestamp;
+        uint256 stopTime = startTime + 1000;
+        uint256 tokenAmount = 1000;
+
+        assertEq(
+            factory.predictStreamAddress(
+                address(this), payer, recipient, tokenAmount, address(token), startTime, stopTime, 0
+            ),
+            factory.createStream(
+                payer, recipient, tokenAmount, address(token), startTime, stopTime, 0
+            )
+        );
+
+        assertEq(
+            factory.predictStreamAddress(
+                address(this), payer, recipient, tokenAmount, address(token), startTime, stopTime, 1
+            ),
+            factory.createStream(
+                payer, recipient, tokenAmount, address(token), startTime, stopTime, 1
+            )
+        );
+    }
+}
+
+contract StreamFactoryCreatesCorrectStreamTest is Test {
+    uint256 constant DURATION = 1000;
+    uint256 constant STREAM_AMOUNT = 2000;
+
+    StreamFactory factory;
+    ERC20Mock token;
+
+    address payer = address(0x1000);
+    address recipient = address(0x1001);
+    uint256 startTime;
+    uint256 stopTime;
+
+    function setUp() public {
+        token = new ERC20Mock("mock-token", "MOK", address(1), 0);
+        factory = new StreamFactory(address(new Stream()));
+
+        startTime = block.timestamp;
+        stopTime = startTime + DURATION;
+    }
+
+    function test_createStream_revertsWhenPayerIsAddressZero() public {
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.PayerIsAddressZero.selector));
+        factory.createStream(
+            address(0), recipient, STREAM_AMOUNT, address(token), startTime, stopTime
+        );
+    }
+
+    function test_createStream_revertsWhenRecipientIsAddressZero() public {
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.RecipientIsAddressZero.selector));
+
+        factory.createStream(payer, address(0), STREAM_AMOUNT, address(token), startTime, stopTime);
+    }
+
+    function test_createStream_revertsWhenTokenAmountIsZero() public {
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.TokenAmountIsZero.selector));
+        factory.createStream(payer, recipient, 0, address(token), startTime, stopTime);
+    }
+
+    function test_createStream_revertsWhenDurationIsNotPositive() public {
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.DurationMustBePositive.selector));
+        factory.createStream(payer, recipient, STREAM_AMOUNT, address(token), startTime, startTime);
+    }
+
+    function test_createStream_revertsWhenAmountLessThanDuration() public {
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.TokenAmountLessThanDuration.selector));
+        factory.createStream(payer, recipient, DURATION - 1, address(token), startTime, stopTime);
+    }
+
+    function test_createStream_savesStreamParameters() public {
+        Stream s = Stream(
+            factory.createStream(
+                payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime
+            )
+        );
+
+        assertEq(s.tokenAmount(), STREAM_AMOUNT);
+        assertEq(s.ratePerSecond(), 2 * s.RATE_DECIMALS_MULTIPLIER());
+        assertEq(s.startTime(), startTime);
+        assertEq(s.stopTime(), stopTime);
+        assertEq(s.recipient(), recipient);
+        assertEq(s.payer(), payer);
+        assertEq(address(s.token()), address(token));
+        assertEq(s.remainingBalance(), STREAM_AMOUNT);
     }
 }
