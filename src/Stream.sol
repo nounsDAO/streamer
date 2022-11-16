@@ -137,7 +137,8 @@ contract Stream is IStream, Clone {
      */
 
     /**
-     * @notice the maximum token balance remaining in the stream when taking withdrawals into account.
+     * @notice The maximum token balance remaining in the stream when taking withdrawals into account.
+     * Should be equal to the stream's token balance once fully funded.
      * @dev using remaining balance rather than a growing sum of withdrawals for gas optimization reasons.
      * This approach warms up this slot upon stream creation, so that withdrawals cost less gas.
      * If this were the sum of withdrawals, recipient would pay 20K extra gas on their first withdrawal.
@@ -173,7 +174,7 @@ contract Stream is IStream, Clone {
      * This does create the possibility for the factory to initialize the same stream twice; this risk seems low
      * and worth the gas savings.
      */
-    function initialize() public {
+    function initialize() external {
         if (msg.sender != factory()) revert OnlyFactory();
 
         remainingBalance = tokenAmount();
