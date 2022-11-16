@@ -36,9 +36,12 @@ contract Stream is IStream, Clone {
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
-    event TokensWithdrawn(address indexed recipient, uint256 amount);
+    /// @dev msgSender is part of the event to enable event indexing with which account performed this action.
+    event TokensWithdrawn(address indexed msgSender, address indexed recipient, uint256 amount);
 
+    /// @dev msgSender is part of the event to enable event indexing with which account performed this action.
     event StreamCancelled(
+        address indexed msgSender,
         address indexed payer,
         address indexed recipient,
         uint256 payerBalance,
@@ -202,7 +205,7 @@ contract Stream is IStream, Clone {
         remainingBalance = remainingBalance - amount;
 
         token().safeTransfer(recipient_, amount);
-        emit TokensWithdrawn(recipient_, amount);
+        emit TokensWithdrawn(msg.sender, recipient_, amount);
     }
 
     /**
@@ -233,7 +236,7 @@ contract Stream is IStream, Clone {
             token_.safeTransfer(payer_, payerBalance);
         }
 
-        emit StreamCancelled(payer_, recipient_, payerBalance, recipientBalance);
+        emit StreamCancelled(msg.sender, payer_, recipient_, payerBalance, recipientBalance);
     }
 
     /**

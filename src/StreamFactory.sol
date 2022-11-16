@@ -39,7 +39,9 @@ contract StreamFactory {
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
 
+    /// @dev msgSender is part of the event to enable event indexing with which account performed this action.
     event StreamCreated(
+        address indexed msgSender,
         address indexed payer,
         address indexed recipient,
         uint256 tokenAmount,
@@ -179,7 +181,9 @@ contract StreamFactory {
         );
         IStream(stream).initialize();
 
-        emit StreamCreated(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, stream);
+        emit StreamCreated(
+            msg.sender, payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, stream
+            );
     }
 
     /**
