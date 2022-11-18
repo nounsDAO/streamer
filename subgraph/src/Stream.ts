@@ -1,23 +1,25 @@
 import { log } from "@graphprotocol/graph-ts";
 import { TokensWithdrawn, StreamCancelled } from "../generated/templates/Stream/Stream";
-import { Stream, Withdrawal } from "../generated/schema";
+import { Withdrawal, Cancellation } from "../generated/schema";
 
 export function handleTokensWithdrawn(event: TokensWithdrawn): void {
-  let withdrawal = new Withdrawal(event.transaction.hash.toHex() + "-" + event.logIndex.toString());
+  const withdrawal = new Withdrawal(event.transaction.hash.toHex() + "-" + event.logIndex.toString());
+
+  withdrawal.withdrawnAt = event.block.timestamp;
   withdrawal.stream = event.address;
   withdrawal.amount = event.params.amount;
+
   withdrawal.save();
 }
 
 export function handleStreamCancelled(event: StreamCancelled): void {
-  let s = Stream.load(event.address);
-  if (s == null) {
-    log.error("Stream not found: {}", [event.address.toString()]);
-    return;
-  }
+  const cancellation = new Cancellation(event.transaction.hash.toHex() + "-" + event.logIndex.toString());
 
-  s.cancelled = true;
-  s.cancelledAt = event.block.timestamp;
+  cancellation.cancelledAt = event.block.timestamp;
+  cancellation.cancelledBy = event.params.msgSender;
+  cancellation.stream = event.address;
+  cancellation.payerBalance = event.params.payerBalance;
+  cancellation.recipientBalance = event.params.recipientBalance;
 
-  s.save();
+  cancellation.save();
 }

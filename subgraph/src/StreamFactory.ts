@@ -3,17 +3,18 @@ import { Stream } from "../generated/schema";
 import { Stream as StreamTemplate } from "../generated/templates";
 
 export function handleStreamCreated(event: StreamCreated): void {
-  let s = new Stream(event.params.streamAddress);
+  const stream = new Stream(event.params.streamAddress);
 
-  s.payer = event.params.payer;
-  s.recipient = event.params.recipient;
-  s.tokenAmount = event.params.tokenAmount;
-  s.tokenAddress = event.params.tokenAddress;
-  s.startTime = event.params.startTime;
-  s.stopTime = event.params.stopTime;
-  s.cancelled = false;
+  stream.createdAt = event.block.timestamp;
+  stream.createdBy = event.params.msgSender;
+  stream.payer = event.params.payer;
+  stream.recipient = event.params.recipient;
+  stream.tokenAmount = event.params.tokenAmount;
+  stream.tokenAddress = event.params.tokenAddress;
+  stream.startTime = event.params.startTime;
+  stream.stopTime = event.params.stopTime;
 
   StreamTemplate.create(event.params.streamAddress);
 
-  s.save();
+  stream.save();
 }

@@ -3,6 +3,8 @@ import { ethereum, Address, BigInt } from "@graphprotocol/graph-ts";
 import { StreamCreated } from "../generated/StreamFactory/StreamFactory";
 
 export function createStreamCreatedEvent(
+  createdAt: BigInt,
+  msgSender: Address,
   payer: Address,
   recipient: Address,
   tokenAmount: BigInt,
@@ -12,8 +14,11 @@ export function createStreamCreatedEvent(
   streamAddress: Address,
 ): StreamCreated {
   let newEvent = changetype<StreamCreated>(newMockEvent());
-  newEvent.parameters = new Array();
 
+  newEvent.block.timestamp = createdAt;
+
+  newEvent.parameters = new Array();
+  newEvent.parameters.push(new ethereum.EventParam("msgSender", ethereum.Value.fromAddress(msgSender)));
   newEvent.parameters.push(new ethereum.EventParam("payer", ethereum.Value.fromAddress(payer)));
   newEvent.parameters.push(new ethereum.EventParam("recipient", ethereum.Value.fromAddress(recipient)));
   newEvent.parameters.push(new ethereum.EventParam("tokenAmount", ethereum.Value.fromUnsignedBigInt(tokenAmount)));
