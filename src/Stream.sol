@@ -123,14 +123,16 @@ contract Stream is IStream, Clone {
     function ratePerSecond() public pure returns (uint256) {
         uint256 duration = stopTime() - startTime();
 
-        // ratePerSecond can lose precision as its being rounded down here
-        // the value lost in rounding down results in less income per second for recipient
-        // max round down impact is duration - 1; e.g. one year, that's 31_557_599
-        // e.g. using USDC (w/ 6 decimals) that's ~32 USDC
-        // since ratePerSecond has 6 decimals, 31_557_599 / 1e6 = 0.00003156; round down impact becomes negligible
-        // finally, this remainder dust becomes available to recipient when stream duration is fully elapsed
-        // see `_recipientBalance` where `blockTime >= stopTime`
-        return RATE_DECIMALS_MULTIPLIER * tokenAmount() / duration;
+        unchecked {
+            // ratePerSecond can lose precision as its being rounded down here
+            // the value lost in rounding down results in less income per second for recipient
+            // max round down impact is duration - 1; e.g. one year, that's 31_557_599
+            // e.g. using USDC (w/ 6 decimals) that's ~32 USDC
+            // since ratePerSecond has 6 decimals, 31_557_599 / 1e6 = 0.00003156; round down impact becomes negligible
+            // finally, this remainder dust becomes available to recipient when stream duration is fully elapsed
+            // see `_recipientBalance` where `blockTime >= stopTime`
+            return RATE_DECIMALS_MULTIPLIER * tokenAmount() / duration;
+        }
     }
 
     /**
@@ -202,7 +204,11 @@ contract Stream is IStream, Clone {
         uint256 balance = balanceOf(recipient_);
         if (balance < amount) revert AmountExceedsBalance();
 
-        remainingBalance = remainingBalance - amount;
+        // This is safe because it should always be the case that:
+        // remainingBalance >= balance >= amount.
+        unchecked {
+            remainingBalance = remainingBalance - amount;
+        }
 
         token().safeTransfer(recipient_, amount);
         emit TokensWithdrawn(msg.sender, recipient_, amount);
@@ -255,7 +261,11 @@ contract Stream is IStream, Clone {
 
         if (who == recipient()) return recipientBalance;
         if (who == payer()) {
-            return remainingBalance - recipientBalance;
+            // This is safe because it should alwys be the case that:
+            // remainingBalance >= recipientBalance.
+            unchecked {
+                return remainingBalance - recipientBalance;
+            }
         }
         return 0;
     }
@@ -301,8 +311,11 @@ contract Stream is IStream, Clone {
         if (blockTime >= stopTime()) {
             balance = tokenAmount_;
         } else {
-            uint256 elapsedTime_ = blockTime - startTime_;
-            balance = (elapsedTime_ * ratePerSecond()) / RATE_DECIMALS_MULTIPLIER;
+            // This is safe because: blockTime > startTime_ (checked above).
+            unchecked {
+                uint256 elapsedTime_ = blockTime - startTime_;
+                balance = (elapsedTime_ * ratePerSecond()) / RATE_DECIMALS_MULTIPLIER;
+            }
         }
 
         uint256 remainingBalance_ = remainingBalance;
@@ -313,8 +326,16 @@ contract Stream is IStream, Clone {
 
         // Take withdrawals into account
         if (tokenAmount_ > remainingBalance_) {
-            uint256 withdrawalAmount = tokenAmount_ - remainingBalance_;
-            balance -= withdrawalAmount;
+            // Should be safe because remainingBalance_ starts as equal to
+            // tokenAmount_ when the stream starts and only grows smaller due to
+            // withdrawals, so tokenAmount_ >= remainingBalance_ is always true.
+            // Should also be always true that balance >= withdrawalAmount, since
+            // at this point balance represents the total amount streamed to recipient
+            // so far, which is always the upper bound of what could have been withdrawn.
+            unchecked {
+                uint256 withdrawalAmount = tokenAmount_ - remainingBalance_;
+                balance -= withdrawalAmount;
+            }
         }
 
         return balance;
