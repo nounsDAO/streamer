@@ -35,4 +35,26 @@ forge test
 
 ## How to deploy
 
-TODO
+### Deploy locally
+
+Run anvil, Foundry's local blockchain:
+
+```sh
+anvil
+```
+
+Copy a pair of sender address + private key from anvil's output; then run:
+
+```sh
+forge script script/DeployStreamAndFactory.s.sol --rpc-url http://127.0.0.1:8545 --broadcast --sender <sender you copied> --private-key <sender private key you copied>
+```
+
+### Deploy to mainnet
+
+Copy `.env.example` and create your own `.env` file with real values.
+
+Then run:
+
+```sh
+forge script script/DeployStreamAndFactory.s.sol --rpc-url $MAINNET_RPC --broadcast --sender $DEPLOYER_MAINNET -i 1
+```

@@ -5,9 +5,13 @@ libs = ['lib']
 solc_version = '0.8.17'
 optimizer_runs = 10000
 
-# See more config options https://github.com/foundry-rs/foundry/tree/master/config
-
 [fmt]
 line_length = 100
 tab_width = 4
 bracket_spacing = true
+
+[rpc_endpoints]
+mainnet = "${MAINNET_RPC}"
+
+[etherscan]
+mainnet = { key = "${ETHERSCAN_API_KEY}" }
