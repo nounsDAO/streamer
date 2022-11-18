@@ -40,6 +40,9 @@ type Withdrawal @entity(immutable: true) {
   "The unix timestamp when this withdrawal was performed."
   withdrawnAt: BigInt!
 
+  "The msg.sender that executed this withdrawal."
+  executedBy: Bytes!
+
   "The stream withdrawn from"
   stream: Stream!
 

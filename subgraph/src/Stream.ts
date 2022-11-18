@@ -6,6 +6,7 @@ export function handleTokensWithdrawn(event: TokensWithdrawn): void {
   const withdrawal = new Withdrawal(event.transaction.hash.toHex() + "-" + event.logIndex.toString());
 
   withdrawal.withdrawnAt = event.block.timestamp;
+  withdrawal.executedBy = event.params.msgSender;
   withdrawal.stream = event.address;
   withdrawal.amount = event.params.amount;
 
