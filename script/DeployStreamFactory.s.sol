@@ -6,7 +6,7 @@ import "forge-std/Script.sol";
 import { Stream } from "../src/Stream.sol";
 import { StreamFactory } from "../src/StreamFactory.sol";
 
-contract DeployStreamAndFactory is Script {
+contract DeployStreamFactory is Script {
     function setUp() public { }
 
     function run() public {

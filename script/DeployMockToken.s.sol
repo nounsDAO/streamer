@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 import "forge-std/Script.sol";
 import { ERC20Mock } from "openzeppelin-contracts/mocks/ERC20Mock.sol";
 
-contract DeployStreamAndFactory is Script {
+contract DeployMockToken is Script {
     function setUp() public { }
 
     function run() public {
