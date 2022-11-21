@@ -4,7 +4,6 @@ schema:
 dataSources:
   - kind: ethereum
     name: StreamFactory
-    network: mainnet
     source:
       abi: StreamFactory
     mapping:
@@ -18,12 +17,12 @@ dataSources:
         - name: StreamFactory
           file: ./abis/StreamFactory.json
       eventHandlers:
-        - event: StreamCreated(indexed address,indexed address,indexed address,uint256,address,uint256,uint256,address)
+        - event: StreamCreated(indexed address,indexed address,indexed
+            address,uint256,address,uint256,uint256,address)
           handler: handleStreamCreated
 templates:
   - name: Stream
     kind: ethereum/contract
-    network: mainnet
     source:
       abi: Stream
     mapping:
@@ -39,5 +38,6 @@ templates:
       eventHandlers:
         - event: TokensWithdrawn(indexed address,indexed address,uint256)
           handler: handleTokensWithdrawn
-        - event: StreamCancelled(indexed address,indexed address,indexed address,uint256,uint256)
+        - event: StreamCancelled(indexed address,indexed address,indexed
+            address,uint256,uint256)
           handler: handleStreamCancelled
