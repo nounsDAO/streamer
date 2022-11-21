@@ -107,9 +107,9 @@ Then run:
 ```sh
 yarn
 yarn codegen
-yarn build
-yarn create-local
-yarn deploy-local
+yarn build:local
+yarn create:local
+yarn deploy:local
 ```
 
 You should now be able to query the subgraph and see your recently created streams and any withdrawals and cancellation events related to it. You can use Postman or any other HTTP request tool, send a POST request to `http://localhost:8000/subgraphs/name/streamer` with a GraphQL query like:
@@ -143,6 +143,44 @@ query {
 }
 ```
 
-## How to deploy
+## How to deploy to Sepolia
 
-TODO
+Copy `./env.example` to `./.env` and set your values.
+
+Deploy StreamFactory:
+
+```sh
+forge script script/DeployStreamFactory.s.sol --verify -vvvvv --rpc-url https://sepolia.infura.io/v3/<infura API key> --broadcast --sender <your deployer account address> -i 1
+```
+
+Deploy ERC20Mock:
+
+```sh
+forge script script/DeployMockToken.s.sol --verify -vvvvv --rpc-url https://sepolia.infura.io/v3/<infura API key> --broadcast --sender <your deployer account address> -i 1
+```
+
+### Subgraph: run a local node indexing Sepolia
+
+At the time of writing, the hosted service does not support Sepolia, but we can still run a local node.
+
+In `./subgraph/networks.json`, make sure StreamFactory's address matches the most recent deployment you want to use; you might find it under `./broadcast/DeployStreamFactory.s.sol/11155111/run-latest.json`.
+
+Copy `./subgraph/.env.example` to `./subgraph/.env` and set network name and RPC env vars - these are used in `docker-compose.yml`.
+
+Spin up your local node: (you need Docker installed and running in the background)
+
+```sh
+yarn local-node
+```
+
+Then run:
+
+```sh
+yarn
+yarn codegen
+yarn build:sepolia
+yarn create:sepolia
+yarn deploy:sepolia
+```
+
+Querying works as outlined above for local testing.

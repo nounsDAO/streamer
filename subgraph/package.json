@@ -2,14 +2,17 @@
   "name": "streamer-subgraph",
   "license": "GPL-3.0",
   "scripts": {
+    "local-node": "docker-compose up",
     "codegen": "graph codegen",
     "build": "graph build",
-    "deploy:goerli": "graph deploy --studio --network goerli streamer",
-    "deploy:mainnet": "graph deploy --studio --network mainnet streamer",
-    "local-node": "docker-compose up",
-    "create-local": "graph create --node http://localhost:8020/ --network local streamer",
-    "remove-local": "graph remove --node http://localhost:8020/ --network local streamer",
-    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 --network local streamer",
+    "build:sepolia": "graph build --network sepolia",
+    "create:sepolia": "graph create --node http://localhost:8020/ --network sepolia streamer",
+    "deploy:sepolia": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 --network sepolia streamer",
+    "remove:sepolia": "graph remove --node http://localhost:8020/ --network sepolia streamer",
+    "build:local": "graph build --network local",
+    "create:local": "graph create --node http://localhost:8020/ --network local streamer",
+    "remove:local": "graph remove --node http://localhost:8020/ --network local streamer",
+    "deploy:local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 --network local streamer",
     "test": "graph test"
   },
   "dependencies": {
