@@ -261,7 +261,7 @@ contract Stream is IStream, Clone {
 
         if (who == recipient()) return recipientBalance;
         if (who == payer()) {
-            // This is safe because it should alwys be the case that:
+            // This is safe because it should always be the case that:
             // remainingBalance >= recipientBalance.
             unchecked {
                 return remainingBalance - recipientBalance;
