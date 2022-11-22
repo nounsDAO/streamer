@@ -1,0 +1,71 @@
+type Stream @entity(immutable: true) {
+  "The address of the stream contract."
+  id: Bytes!
+
+  "The unix timestamp when this stream was created."
+  createdAt: BigInt!
+
+  "The msg.sender that created this stream."
+  createdBy: Bytes!
+
+  "The account funding this stream."
+  payer: Bytes!
+
+  "The account receiving funds from this stream."
+  recipient: Bytes!
+
+  "The total amount payer is paying recipient in this stream."
+  tokenAmount: BigInt!
+
+  "The contract address of this stream's payment token."
+  tokenAddress: Bytes!
+
+  "The unix timestamp when this stream starts."
+  startTime: BigInt!
+
+  "The unix timestamp when this stream ends."
+  stopTime: BigInt!
+
+  "All the withdrawal performed on this stream."
+  withdrawals: [Withdrawal!] @derivedFrom(field: "stream")
+
+  "All the cancellations performed on this stream. A stream can be cancelled more than once, e.g. if payer accidentally sends extra funds to the stream after it was cancelled."
+  cancellations: [Cancellation!] @derivedFrom(field: "stream")
+}
+
+type Withdrawal @entity(immutable: true) {
+  "A concatination of the withdrawal tx hash and the the event log index"
+  id: String!
+
+  "The unix timestamp when this withdrawal was performed."
+  withdrawnAt: BigInt!
+
+  "The msg.sender that executed this withdrawal."
+  executedBy: Bytes!
+
+  "The stream withdrawn from"
+  stream: Stream!
+
+  "The withdrawal amount"
+  amount: BigInt!
+}
+
+type Cancellation @entity(immutable: true) {
+  "A concatination of the cancellation tx hash and the the event log index"
+  id: String!
+
+  "The unix timestamp when this cancellation was created."
+  cancelledAt: BigInt!
+
+  "The msg.sender that created this cancellation."
+  cancelledBy: Bytes!
+
+  "The cancelled stream"
+  stream: Stream!
+
+  "The balance sent to payer upon this cancellation."
+  payerBalance: BigInt!
+
+  "The balance sent to recipient upon this cancellation."
+  recipientBalance: BigInt!
+}

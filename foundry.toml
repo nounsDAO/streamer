@@ -12,6 +12,8 @@ bracket_spacing = true
 
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC}"
+seploia = "${SEPOLIA_RPC}"
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY}" }
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
