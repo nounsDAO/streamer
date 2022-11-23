@@ -90,7 +90,7 @@ contract StreamFactory {
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
-    ) public returns (address) {
+    ) external returns (address) {
         return createStream(
             msg.sender, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0
         );
@@ -114,7 +114,7 @@ contract StreamFactory {
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
-    ) public returns (address stream) {
+    ) external returns (address stream) {
         stream =
             createStream(msg.sender, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0);
         IERC20(tokenAddress).safeTransferFrom(msg.sender, stream, tokenAmount);
@@ -137,14 +137,14 @@ contract StreamFactory {
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
-    ) public returns (address) {
+    ) external returns (address) {
         return createStream(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0);
     }
 
     /**
      * @notice Create a new stream contract instance, and verify the new stream address matches expectations from
      * using `predictStreamAddress`.
-     * @param payer the account responsible for funding the stream.
+     * The payer is assumed to be `msg.sender`.
      * @param recipient the recipient of the stream.
      * @param tokenAmount the total token amount payer is streaming to recipient.
      * @param tokenAddress the contract address of the payment token.
@@ -154,15 +154,15 @@ contract StreamFactory {
      * @return stream the address of the new stream contract.
      */
     function createStream(
-        address payer,
         address recipient,
         uint256 tokenAmount,
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime,
         address predictedStreamAddress
-    ) public returns (address stream) {
-        stream = createStream(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0);
+    ) external returns (address stream) {
+        stream =
+            createStream(msg.sender, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0);
         if (stream != predictedStreamAddress) revert UnexpectedStreamAddress();
     }
 
@@ -236,7 +236,7 @@ contract StreamFactory {
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime
-    ) public view returns (address) {
+    ) external view returns (address) {
         return predictStreamAddress(
             msgSender, payer, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0
         );
