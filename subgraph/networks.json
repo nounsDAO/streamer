@@ -10,5 +10,11 @@
       "address": "0xb9Ae8c26487719214D8F0814eC9ea03F02a93dF1",
       "startBlock": 2333348
     }
+  },
+  "goerli": {
+    "StreamFactory": {
+      "address": "0x51EdD88CD84e93e99d49122144Efc0719D6eE450",
+      "startBlock": 8001129
+    }
   }
 }

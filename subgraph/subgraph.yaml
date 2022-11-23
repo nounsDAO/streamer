@@ -6,8 +6,8 @@ dataSources:
     name: StreamFactory
     source:
       abi: StreamFactory
-      address: "0xb9Ae8c26487719214D8F0814eC9ea03F02a93dF1"
-      startBlock: 2333348
+      address: "0x51EdD88CD84e93e99d49122144Efc0719D6eE450"
+      startBlock: 8001129
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.6
@@ -22,7 +22,7 @@ dataSources:
         - event: StreamCreated(indexed address,indexed address,indexed
             address,uint256,address,uint256,uint256,address)
           handler: handleStreamCreated
-    network: sepolia
+    network: goerli
 templates:
   - name: Stream
     kind: ethereum/contract
@@ -44,4 +44,4 @@ templates:
         - event: StreamCancelled(indexed address,indexed address,indexed
             address,uint256,uint256)
           handler: handleStreamCancelled
-    network: sepolia
+    network: goerli
