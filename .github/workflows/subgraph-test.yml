@@ -1,6 +1,10 @@
 name: Subgraph CI
 
-on: [workflow_dispatch, pull_request, push]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
 
 jobs:
   build_and_test:
