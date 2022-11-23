@@ -254,6 +254,50 @@ contract StreamFactoryTest is Test {
             )
         );
     }
+
+    function test_createStream_revertsWhenStreamAddressDoesntMatchExpectedAddress() public {
+        uint256 startTime = block.timestamp;
+        uint256 stopTime = startTime + 1000;
+        uint256 tokenAmount = 1000;
+        address predictedAddress = factory.predictStreamAddress(
+            address(this),
+            address(this),
+            recipient,
+            tokenAmount,
+            address(token),
+            startTime,
+            stopTime,
+            0
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.UnexpectedStreamAddress.selector));
+        // changing stopTime to result in a different address
+        factory.createStream(
+            recipient, tokenAmount, address(token), startTime, stopTime - 1, predictedAddress
+        );
+    }
+
+    function test_createStream_worksWhenStreamAddressMatchesExpectedAddress() public {
+        uint256 startTime = block.timestamp;
+        uint256 stopTime = startTime + 1000;
+        uint256 tokenAmount = 1000;
+        address predictedAddress = factory.predictStreamAddress(
+            address(this),
+            address(this),
+            recipient,
+            tokenAmount,
+            address(token),
+            startTime,
+            stopTime,
+            0
+        );
+
+        address streamAddress = factory.createStream(
+            recipient, tokenAmount, address(token), startTime, stopTime, predictedAddress
+        );
+
+        assertEq(predictedAddress, streamAddress);
+    }
 }
 
 contract StreamFactoryCreatesCorrectStreamTest is Test {
