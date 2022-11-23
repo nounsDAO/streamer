@@ -184,3 +184,19 @@ yarn deploy:sepolia
 ```
 
 Querying works as outlined above for local testing.
+
+## Latest deployment
+
+### Goerli
+
+| Contract      | Address                                                                                                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| StreamFactory | [0x51EdD88CD84e93e99d49122144Efc0719D6eE450](https://goerli.etherscan.io/address/0x51EdD88CD84e93e99d49122144Efc0719D6eE450) |
+| Stream        | [0x033250f82FAbc5dD0005aB314e3c0124623d9D58](https://goerli.etherscan.io/address/0x033250f82FAbc5dD0005aB314e3c0124623d9D58) |
+
+### Sepolia
+
+| Contract      | Address                                                                                                                       |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| StreamFactory | [0xb9Ae8c26487719214D8F0814eC9ea03F02a93dF1](https://sepolia.etherscan.io/address/0xb9Ae8c26487719214D8F0814eC9ea03F02a93dF1) |
+| Stream        | [0xbA392711DdEB73531f5B1729e3C65D0F0aDbD288](https://sepolia.etherscan.io/address/0xbA392711DdEB73531f5B1729e3C65D0F0aDbD288) |
