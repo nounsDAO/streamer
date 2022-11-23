@@ -696,3 +696,46 @@ contract StreamWithRemainderHighDurationAndAmountTest is StreamTest {
         vm.stopPrank();
     }
 }
+
+contract StreamRescueERC20Test is StreamTest {
+    ERC20Mock otherToken;
+
+    function setUp() public override {
+        super.setUp();
+
+        s = Stream(
+            factory.createStream(
+                payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime
+            )
+        );
+
+        otherToken = new ERC20Mock("Other Token", "OTHER", address(1), 0);
+    }
+
+    function test_rescueERC20_revertsWhenCallerIsntPayer() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.CallerNotPayer.selector));
+        s.rescueERC20(address(otherToken), 0);
+    }
+
+    function test_rescueERC20_revertsWhenTryingToRecoverStreamToken() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.CannotRescueStreamToken.selector));
+        vm.prank(payer);
+        s.rescueERC20(address(token), 0);
+    }
+
+    function test_rescueERC20_revertsWhenAmountIsGreaterThanBalance() public {
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        vm.prank(payer);
+        s.rescueERC20(address(otherToken), 1);
+    }
+
+    function test_rescueERC20_worksWhenAmountDoesntExceedBalance() public {
+        otherToken.mint(address(s), 1234);
+        assertEq(otherToken.balanceOf(payer), 0);
+
+        vm.prank(payer);
+        s.rescueERC20(address(otherToken), 1234);
+
+        assertEq(otherToken.balanceOf(payer), 1234);
+    }
+}

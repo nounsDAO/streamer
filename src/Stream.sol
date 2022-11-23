@@ -29,6 +29,8 @@ contract Stream is IStream, Clone {
     error CantWithdrawZero();
     error AmountExceedsBalance();
     error CallerNotPayerOrRecipient();
+    error CallerNotPayer();
+    error CannotRescueStreamToken();
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -168,6 +170,17 @@ contract Stream is IStream, Clone {
     }
 
     /**
+     * @dev Reverts if the caller is not the payer of the stream.
+     */
+    modifier onlyPayer() {
+        if (msg.sender != payer()) {
+            revert CallerNotPayer();
+        }
+
+        _;
+    }
+
+    /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      *   INITIALIZER
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -243,6 +256,19 @@ contract Stream is IStream, Clone {
         }
 
         emit StreamCancelled(msg.sender, payer_, recipient_, payerBalance, recipientBalance);
+    }
+
+    /**
+     * @notice Recover ERC20 tokens accidentally sent to this stream.
+     * Reverts when trying to recover this stream's payment token.
+     * Reverts when msg.sender is not this stream's payer.
+     * @param tokenAddress the contract address of the token to recover.
+     * @param amount the amount to recover.
+     */
+    function rescueERC20(address tokenAddress, uint256 amount) external onlyPayer {
+        if (tokenAddress == address(token())) revert CannotRescueStreamToken();
+
+        IERC20(tokenAddress).safeTransfer(msg.sender, amount);
     }
 
     /**
