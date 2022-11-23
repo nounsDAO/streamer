@@ -1,6 +1,10 @@
 name: Forge tests
 
-on: [workflow_dispatch, pull_request, push]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
 
 env:
   FOUNDRY_PROFILE: ci
