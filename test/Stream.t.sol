@@ -717,19 +717,23 @@ contract StreamRescueERC20Test is StreamTest {
         s.rescueERC20(address(otherToken), 0);
     }
 
-    function test_rescueERC20_revertsWhenTryingToRecoverStreamToken() public {
-        vm.expectRevert(abi.encodeWithSelector(Stream.CannotRescueStreamToken.selector));
-        vm.prank(payer);
-        s.rescueERC20(address(token), 0);
-    }
-
     function test_rescueERC20_revertsWhenAmountIsGreaterThanBalance() public {
         vm.expectRevert("ERC20: transfer amount exceeds balance");
         vm.prank(payer);
         s.rescueERC20(address(otherToken), 1);
     }
 
-    function test_rescueERC20_worksWhenAmountDoesntExceedBalance() public {
+    function test_rescueERC20_streamToken_revertsWhenTryingToRecoverTooManyStreamTokens() public {
+        token.mint(address(s), STREAM_AMOUNT);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Stream.RescueTokenAmountExceedsExcessBalance.selector)
+        );
+        vm.prank(payer);
+        s.rescueERC20(address(token), 1);
+    }
+
+    function test_rescueERC20_otherToken_worksWhenAmountDoesntExceedBalance() public {
         otherToken.mint(address(s), 1234);
         assertEq(otherToken.balanceOf(payer), 0);
 
@@ -737,5 +741,27 @@ contract StreamRescueERC20Test is StreamTest {
         s.rescueERC20(address(otherToken), 1234);
 
         assertEq(otherToken.balanceOf(payer), 1234);
+    }
+
+    function test_rescueERC20_streamToken_worksWhenAmountDoesntExceedExcessBalance() public {
+        token.mint(address(s), STREAM_AMOUNT + 1234);
+
+        vm.prank(payer);
+        s.rescueERC20(address(token), 1234);
+
+        assertEq(token.balanceOf(payer), 1234);
+    }
+
+    function test_rescueERC20_streamToken_worksAfterWithdrawals() public {
+        token.mint(address(s), STREAM_AMOUNT + 1234);
+
+        vm.warp(startTime + (DURATION / 2));
+        vm.prank(recipient);
+        s.withdraw(STREAM_AMOUNT / 2);
+
+        vm.prank(payer);
+        s.rescueERC20(address(token), 1234);
+
+        assertEq(token.balanceOf(payer), 1234);
     }
 }

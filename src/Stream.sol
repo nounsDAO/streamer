@@ -30,7 +30,7 @@ contract Stream is IStream, Clone {
     error AmountExceedsBalance();
     error CallerNotPayerOrRecipient();
     error CallerNotPayer();
-    error CannotRescueStreamToken();
+    error RescueTokenAmountExceedsExcessBalance();
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -260,13 +260,17 @@ contract Stream is IStream, Clone {
 
     /**
      * @notice Recover ERC20 tokens accidentally sent to this stream.
-     * Reverts when trying to recover this stream's payment token.
+     * Reverts when trying to recover stream's payment token at an amount that exceeds
+     * the excess token balance; any rescue should always leave sufficient tokens to
+     * fully pay recipient.
      * Reverts when msg.sender is not this stream's payer.
      * @param tokenAddress the contract address of the token to recover.
      * @param amount the amount to recover.
      */
     function rescueERC20(address tokenAddress, uint256 amount) external onlyPayer {
-        if (tokenAddress == address(token())) revert CannotRescueStreamToken();
+        if (tokenAddress == address(token()) && amount > tokenBalance() - remainingBalance) {
+            revert RescueTokenAmountExceedsExcessBalance();
+        }
 
         IERC20(tokenAddress).safeTransfer(msg.sender, amount);
     }
