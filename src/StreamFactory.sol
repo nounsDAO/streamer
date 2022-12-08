@@ -33,6 +33,7 @@ contract StreamFactory {
     error DurationMustBePositive();
     error TokenAmountLessThanDuration();
     error UnexpectedStreamAddress();
+    error StopTimeNotInTheFuture();
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -197,6 +198,7 @@ contract StreamFactory {
         if (recipient == address(0)) revert RecipientIsAddressZero();
         if (tokenAmount == 0) revert TokenAmountIsZero();
         if (stopTime <= startTime) revert DurationMustBePositive();
+        if (stopTime <= block.timestamp) revert StopTimeNotInTheFuture();
         if (tokenAmount < stopTime - startTime) revert TokenAmountLessThanDuration();
 
         stream = streamImplementation.cloneDeterministic(

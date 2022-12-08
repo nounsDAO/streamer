@@ -343,6 +343,14 @@ contract StreamFactoryCreatesCorrectStreamTest is Test {
         factory.createStream(payer, recipient, STREAM_AMOUNT, address(token), startTime, startTime);
     }
 
+    function test_createStream_revertsWhenStopTimeIsNotInTheFuture() public {
+        vm.warp(101);
+        vm.expectRevert(abi.encodeWithSelector(StreamFactory.StopTimeNotInTheFuture.selector));
+        factory.createStream(
+            payer, recipient, STREAM_AMOUNT, address(token), block.timestamp - 100, block.timestamp
+        );
+    }
+
     function test_createStream_revertsWhenAmountLessThanDuration() public {
         vm.expectRevert(abi.encodeWithSelector(StreamFactory.TokenAmountLessThanDuration.selector));
         factory.createStream(payer, recipient, DURATION - 1, address(token), startTime, stopTime);
