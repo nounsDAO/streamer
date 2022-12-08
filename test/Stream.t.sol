@@ -483,7 +483,6 @@ contract StreamCancelTest is StreamTest {
         vm.warp(startTime + elapsedTime);
 
         uint256 withdrawAmount = (withdrawalsPercents * s.balanceOf(recipient)) / 100;
-        console.log("withdrawAmount", withdrawAmount);
 
         vm.prank(recipient);
         s.withdraw(withdrawAmount);
