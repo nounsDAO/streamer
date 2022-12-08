@@ -154,6 +154,13 @@ contract Stream is IStream, Clone {
     uint256 public remainingBalance;
 
     /**
+     * @notice The recipient's balance once the stream is cancelled. It is set to the recipient's balance
+     * at the moment of cancellation, and is decremented when recipient withdraws post-cancellation.
+     * @dev It's assumed to be zero as long as the stream has not been cancelled.
+     */
+    uint256 public recipientCancelBalance;
+
+    /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      *   MODIFIERS
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -209,19 +216,31 @@ contract Stream is IStream, Clone {
      * @notice Withdraw tokens to recipient's account.
      * Execution fails if the requested amount is greater than recipient's withdrawable balance.
      * Only this stream's payer or recipient can call this function.
+     * @dev Until a stream is cancelled, `remainingBalance` is used to capture withdrawal information.
+     * Once cancelled, recipientCancelBalance is used to capture withdrawal information.
+     * Either variable is decremented by `amount` tokens.
      * @param amount the amount of tokens to withdraw.
      */
     function withdraw(uint256 amount) external onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
+        uint256 recipientCancelBalance_ = recipientCancelBalance;
 
-        uint256 balance = balanceOf(recipient_);
-        if (balance < amount) revert AmountExceedsBalance();
+        if (recipientCancelBalance_ > 0) {
+            if (recipientCancelBalance_ < amount) revert AmountExceedsBalance();
+            // Safe because of the above check and revert.
+            unchecked {
+                recipientCancelBalance = recipientCancelBalance_ - amount;
+            }
+        } else {
+            uint256 balance = balanceOf(recipient_);
+            if (balance < amount) revert AmountExceedsBalance();
 
-        // This is safe because it should always be the case that:
-        // remainingBalance >= balance >= amount.
-        unchecked {
-            remainingBalance = remainingBalance - amount;
+            // This is safe because it should always be the case that:
+            // remainingBalance >= balance >= amount.
+            unchecked {
+                remainingBalance = remainingBalance - amount;
+            }
         }
 
         token().safeTransfer(recipient_, amount);
@@ -229,38 +248,42 @@ contract Stream is IStream, Clone {
     }
 
     /**
-     * @notice Cancel the stream and send payer and recipient their fair share of the funds.
-     * If the stream is sufficiently funded to pay recipient, execution will always succeed.
-     * Payer receives the stream's token balance after paying recipient, which is fair if payer
-     * hadn't fully funded the stream.
+     * @notice Cancel the stream and update recipient's fair share of the funds to their current balance.
+     * Each party must take additional action to withdraw their funds:
+     * recipient must call `withdraw`.
+     * payer must call `recoverTokens`.
      * Only this stream's payer or recipient can call this function.
      */
     function cancel() external onlyPayerOrRecipient {
         address payer_ = payer();
         address recipient_ = recipient();
-        IERC20 token_ = token();
+        uint256 tokenBalance_ = tokenBalance();
 
         uint256 recipientBalance = balanceOf(recipient_);
+
+        // This overrides `withdraw` logic to allow recipient to withdraw their fair share.
+        recipientCancelBalance = recipientBalance;
 
         // This zeroing is important because without it, it's possible for recipient to obtain additional funds
         // from this contract if anyone (e.g. payer) sends it tokens after cancellation.
         // Thanks to this state update, `balanceOf(recipient_)` will only return zero in future calls.
         remainingBalance = 0;
 
-        if (recipientBalance > 0) token_.safeTransfer(recipient_, recipientBalance);
-
-        // Using the stream's token balance rather than any other calculated field because it gracefully
-        // supports cancelling the stream even if payer hasn't fully funded it.
-        uint256 payerBalance = tokenBalance();
-        if (payerBalance > 0) {
-            token_.safeTransfer(payer_, payerBalance);
+        // When the stream is underfunded payer might not have an outstanding balance.
+        // Calculating payer's balance using the stream's token balance also accounts for when the stream might be overfunded.
+        uint256 payerBalance = 0;
+        if (tokenBalance_ > recipientBalance) {
+            unchecked {
+                payerBalance = tokenBalance_ - recipientBalance;
+            }
         }
 
         emit StreamCancelled(msg.sender, payer_, recipient_, payerBalance, recipientBalance);
     }
 
     /**
-     * @notice Recover ERC20 tokens accidentally sent to this stream.
+     * @notice Recover excess stream payment tokens, or other ERC20 tokens accidentally sent to this stream.
+     * When a stream is cancelled payer uses this function to recover their fair share of tokens.
      * Reverts when trying to recover stream's payment token at an amount that exceeds
      * the excess token balance; any rescue should always leave sufficient tokens to
      * fully pay recipient.
@@ -270,10 +293,12 @@ contract Stream is IStream, Clone {
      * @param tokenAddress the contract address of the token to recover.
      * @param amount the amount to recover.
      */
-    function rescueERC20(address tokenAddress, uint256 amount) external onlyPayer {
+    function recoverTokens(address tokenAddress, uint256 amount) external onlyPayer {
         // When the stream is under-funded, it should keep its current balance
-        // When it's sufficiently-funded, it should keep the full balance committed to recipient, i.e. `remainingBalance`
-        uint256 requiredBalanceAfter = Math.min(tokenBalance(), remainingBalance);
+        // When it's sufficiently-funded, it should keep the full balance committed to recipient
+        // i.e. `remainingBalance` or `recipientCancelBalance`
+        uint256 requiredBalanceAfter =
+            Math.min(tokenBalance(), Math.max(remainingBalance, recipientCancelBalance));
 
         IERC20(tokenAddress).safeTransfer(msg.sender, amount);
 
@@ -296,10 +321,13 @@ contract Stream is IStream, Clone {
 
         if (who == recipient()) return recipientBalance;
         if (who == payer()) {
-            // This is safe because it should always be the case that:
-            // remainingBalance >= recipientBalance.
-            unchecked {
-                return remainingBalance - recipientBalance;
+            uint256 tokenTotal_ = Math.max(tokenBalance(), remainingBalance);
+            // tokenBalance can be less than recipientBalance, e.g. when a stream is cancelled after recipient
+            // accumulated vested balance, and before payer funded the stream.
+            if (tokenTotal_ > recipientBalance) {
+                unchecked {
+                    return tokenTotal_ - recipientBalance;
+                }
             }
         }
         return 0;
@@ -334,12 +362,17 @@ contract Stream is IStream, Clone {
 
     /**
      * @dev Helper function for `balanceOf` in calculating recipient's fair share of tokens, taking withdrawals into account.
+     * When a stream is cancelled the balance will be `recipientCancelBalance` until it's fully withdrawan, then
+     * it will remain at zero.
      */
     function _recipientBalance() internal view returns (uint256) {
         uint256 startTime_ = startTime();
         uint256 blockTime = block.timestamp;
 
         if (blockTime <= startTime_) return 0;
+
+        uint256 recipientCancelBalance_ = recipientCancelBalance;
+        if (recipientCancelBalance_ > 0) return recipientCancelBalance_;
 
         uint256 tokenAmount_ = tokenAmount();
         uint256 balance;
