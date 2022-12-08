@@ -764,4 +764,14 @@ contract StreamRescueERC20Test is StreamTest {
 
         assertEq(token.balanceOf(payer), 1234);
     }
+
+    function test_rescueERC20_streamToken_revertsWhenUnderfunded() public {
+        token.mint(address(s), STREAM_AMOUNT - 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Stream.RescueTokenAmountExceedsExcessBalance.selector)
+        );
+        vm.prank(payer);
+        s.rescueERC20(address(token), STREAM_AMOUNT - 2);
+    }
 }

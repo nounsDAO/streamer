@@ -6,6 +6,7 @@ import { IStream } from "./IStream.sol";
 import { Clone } from "solady/utils/Clone.sol";
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 
 /**
  * @title Stream
@@ -264,15 +265,19 @@ contract Stream is IStream, Clone {
      * the excess token balance; any rescue should always leave sufficient tokens to
      * fully pay recipient.
      * Reverts when msg.sender is not this stream's payer.
+     * @dev Checking token balance before and after to defend against the case of multiple contracts
+     * updating the balance of the same token.
      * @param tokenAddress the contract address of the token to recover.
      * @param amount the amount to recover.
      */
     function rescueERC20(address tokenAddress, uint256 amount) external onlyPayer {
-        if (tokenAddress == address(token()) && amount > tokenBalance() - remainingBalance) {
-            revert RescueTokenAmountExceedsExcessBalance();
-        }
+        // When the stream is under-funded, it should keep its current balance
+        // When it's sufficiently-funded, it should keep the full balance committed to recipient, i.e. `remainingBalance`
+        uint256 requiredBalanceAfter = Math.min(tokenBalance(), remainingBalance);
 
         IERC20(tokenAddress).safeTransfer(msg.sender, amount);
+
+        if (tokenBalance() < requiredBalanceAfter) revert RescueTokenAmountExceedsExcessBalance();
     }
 
     /**
