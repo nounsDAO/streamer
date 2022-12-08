@@ -328,19 +328,22 @@ contract Stream is IStream, Clone {
      */
     function _recipientBalance() internal view returns (uint256) {
         uint256 startTime_ = startTime();
+        uint256 stopTime_ = stopTime();
         uint256 blockTime = block.timestamp;
 
         if (blockTime <= startTime_) return 0;
 
         uint256 tokenAmount_ = tokenAmount();
         uint256 balance;
-        if (blockTime >= stopTime()) {
+        if (blockTime >= stopTime_) {
             balance = tokenAmount_;
         } else {
             // This is safe because: blockTime > startTime_ (checked above).
+            // and stopTime_ > startTime_ (checked in StreamFactory).
             unchecked {
                 uint256 elapsedTime_ = blockTime - startTime_;
-                balance = (elapsedTime_ * ratePerSecond()) / RATE_DECIMALS_MULTIPLIER;
+                uint256 duration = stopTime_ - startTime_;
+                balance = elapsedTime_ * tokenAmount_ / duration;
             }
         }
 
