@@ -28,6 +28,8 @@ contract StreamTest is Test {
         uint256 recipientBalance
     );
 
+    event TokensRecovered(address tokenAddress, uint256 amount);
+
     ERC20Mock token;
     Stream s;
     StreamFactory factory;
@@ -747,7 +749,9 @@ contract StreamRecoverTokensTest is StreamTest {
         s.recoverTokens(address(otherToken), 1);
     }
 
-    function test_recoverTokens_streamToken_revertsWhenTryingToRecoverTooManyStreamTokens() public {
+    function test_recoverTokens_streamToken_revertsWhenTryingToRecoverTooManyStreamTokens()
+        public
+    {
         token.mint(address(s), STREAM_AMOUNT);
 
         vm.expectRevert(
@@ -761,6 +765,9 @@ contract StreamRecoverTokensTest is StreamTest {
         otherToken.mint(address(s), 1234);
         assertEq(otherToken.balanceOf(payer), 0);
 
+        vm.expectEmit(true, true, true, true);
+        emit TokensRecovered(address(otherToken), 1234);
+
         vm.prank(payer);
         s.recoverTokens(address(otherToken), 1234);
 
@@ -769,6 +776,9 @@ contract StreamRecoverTokensTest is StreamTest {
 
     function test_recoverTokens_streamToken_worksWhenAmountDoesntExceedExcessBalance() public {
         token.mint(address(s), STREAM_AMOUNT + 1234);
+
+        vm.expectEmit(true, true, true, true);
+        emit TokensRecovered(address(token), 1234);
 
         vm.prank(payer);
         s.recoverTokens(address(token), 1234);
@@ -782,6 +792,9 @@ contract StreamRecoverTokensTest is StreamTest {
         vm.warp(startTime + (DURATION / 2));
         vm.prank(recipient);
         s.withdraw(STREAM_AMOUNT / 2);
+
+        vm.expectEmit(true, true, true, true);
+        emit TokensRecovered(address(token), 1234);
 
         vm.prank(payer);
         s.recoverTokens(address(token), 1234);

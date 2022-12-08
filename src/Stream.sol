@@ -51,6 +51,8 @@ contract Stream is IStream, Clone {
         uint256 recipientBalance
     );
 
+    event TokensRecovered(address tokenAddress, uint256 amount);
+
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      *   IMMUTABLES
@@ -303,6 +305,8 @@ contract Stream is IStream, Clone {
         IERC20(tokenAddress).safeTransfer(msg.sender, amount);
 
         if (tokenBalance() < requiredBalanceAfter) revert RescueTokenAmountExceedsExcessBalance();
+
+        emit TokensRecovered(tokenAddress, amount);
     }
 
     /**
