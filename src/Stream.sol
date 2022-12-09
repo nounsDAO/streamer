@@ -153,7 +153,7 @@ contract Stream is IStream, Clone {
      */
     uint256 public remainingBalance;
 
-    mapping(address => uint256) public availableTokens;
+    uint256 public recipientTokensAfterCancel;
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -248,7 +248,7 @@ contract Stream is IStream, Clone {
         // Thanks to this state update, `balanceOf(recipient_)` will only return zero in future calls.
         remainingBalance = 0;
 
-        if (recipientBalance > 0) availableTokens[recipient_] += recipientBalance;
+        if (recipientBalance > 0) recipientTokensAfterCancel += recipientBalance;
 
         // Using the stream's token balance rather than any other calculated field because it gracefully
         // supports cancelling the stream even if payer hasn't fully funded it.
@@ -259,10 +259,10 @@ contract Stream is IStream, Clone {
         emit StreamCancelled(msg.sender, payer_, recipient_, payerBalance, recipientBalance);
     }
 
-    function withdrawAvailableTokens(uint256 amount) external {
-        availableTokens[msg.sender] -= amount;
+    function withdrawRecipientTokensAfterCancel(uint256 amount) external onlyPayerOrRecipient {
+        recipientTokensAfterCancel -= amount;
 
-        token().safeTransfer(msg.sender, amount);
+        token().safeTransfer(recipient(), amount);
     }
 
     /**
