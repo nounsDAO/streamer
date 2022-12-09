@@ -242,6 +242,7 @@ contract Stream is IStream, Clone {
         address recipient_ = recipient();
 
         uint256 recipientBalance = balanceOf(recipient_);
+        uint256 payerBalance = balanceOf(payer_);
 
         // This zeroing is important because without it, it's possible for recipient to obtain additional funds
         // from this contract if anyone (e.g. payer) sends it tokens after cancellation.
@@ -249,12 +250,6 @@ contract Stream is IStream, Clone {
         remainingBalance = 0;
 
         if (recipientBalance > 0) recipientTokensAfterCancel += recipientBalance;
-
-        // Using the stream's token balance rather than any other calculated field because it gracefully
-        // supports cancelling the stream even if payer hasn't fully funded it.
-
-        // TODO: maybe change this to `balanceOf(payer_)`
-        uint256 payerBalance = tokenBalance();
 
         emit StreamCancelled(msg.sender, payer_, recipient_, payerBalance, recipientBalance);
     }
@@ -279,7 +274,8 @@ contract Stream is IStream, Clone {
     function rescueERC20(address tokenAddress, uint256 amount) external onlyPayer {
         // When the stream is under-funded, it should keep its current balance
         // When it's sufficiently-funded, it should keep the full balance committed to recipient, i.e. `remainingBalance`
-        uint256 requiredBalanceAfter = Math.min(tokenBalance(), remainingBalance);
+        uint256 requiredBalanceAfter =
+            Math.min(tokenBalance(), remainingBalance + recipientTokensAfterCancel);
 
         IERC20(tokenAddress).safeTransfer(msg.sender, amount);
 
