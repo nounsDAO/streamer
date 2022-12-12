@@ -31,6 +31,7 @@ contract Stream is IStream, Clone {
     error CallerNotPayerOrRecipient();
     error CallerNotPayer();
     error CannotRescueStreamToken();
+    error ETHRescueFailed();
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -49,6 +50,8 @@ contract Stream is IStream, Clone {
         uint256 payerBalance,
         uint256 recipientBalance
     );
+
+    event ETHRescued(address indexed payer, address indexed to, uint256 amount);
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -269,6 +272,23 @@ contract Stream is IStream, Clone {
         if (tokenAddress == address(token())) revert CannotRescueStreamToken();
 
         IERC20(tokenAddress).safeTransfer(msg.sender, amount);
+    }
+
+    /**
+     * @notice Recover ETH accidentally sent to this stream.
+     * Reverts if ETH sending failed.
+     * @dev This is necessary because `LibClone` creates minimal clones with a default receive function, rather than
+     * forwarding to clones, to support gas-restrictive transfers that might fail with the extra gas cost of DELEGATECALL.
+     * So rather than block ETH transfers, we're allowing payer to recover ETH.
+     * @param to the address to send ETH to, useful when payer might be a contract that can't receive ETH.
+     * @param amount the amount of ETH to recover.
+     */
+    function rescueETH(address to, uint256 amount) external onlyPayer {
+        (bool sent,) = to.call{value: amount}("");
+
+        if (!sent) revert ETHRescueFailed();
+
+        emit ETHRescued(msg.sender, to, amount);
     }
 
     /**
