@@ -218,31 +218,39 @@ contract Stream is IStream, Clone {
      * @notice Withdraw tokens to recipient's account.
      * Execution fails if the requested amount is greater than recipient's withdrawable balance.
      * Only this stream's payer or recipient can call this function.
-     * @dev Until a stream is cancelled, `remainingBalance` is used to capture withdrawal information.
-     * Once cancelled, recipientCancelBalance is used to capture withdrawal information.
-     * Either variable is decremented by `amount` tokens.
      * @param amount the amount of tokens to withdraw.
      */
     function withdraw(uint256 amount) external onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
+
+        uint256 balance = balanceOf(recipient_);
+        if (balance < amount) revert AmountExceedsBalance();
+
+        // This is safe because it should always be the case that:
+        // remainingBalance >= balance >= amount.
+        unchecked {
+            remainingBalance = remainingBalance - amount;
+        }
+
+        token().safeTransfer(recipient_, amount);
+        emit TokensWithdrawn(msg.sender, recipient_, amount);
+    }
+
+    /**
+     * @notice Withdraw tokens to recipient's account after the stream has been cancelled.
+     * Execution fails if the requested amount is greater than recipient's withdrawable balance.
+     * Only this stream's payer or recipient can call this function.
+     * @param amount the amount of tokens to withdraw.
+     */
+    function withdrawAfterCancel(uint256 amount) external onlyPayerOrRecipient {
+        if (amount == 0) revert CantWithdrawZero();
+        address recipient_ = recipient();
         uint256 recipientCancelBalance_ = recipientCancelBalance;
 
-        if (recipientCancelBalance_ > 0) {
-            if (recipientCancelBalance_ < amount) revert AmountExceedsBalance();
-            // Safe because of the above check and revert.
-            unchecked {
-                recipientCancelBalance = recipientCancelBalance_ - amount;
-            }
-        } else {
-            uint256 balance = balanceOf(recipient_);
-            if (balance < amount) revert AmountExceedsBalance();
-
-            // This is safe because it should always be the case that:
-            // remainingBalance >= balance >= amount.
-            unchecked {
-                remainingBalance = remainingBalance - amount;
-            }
+        if (recipientCancelBalance_ < amount) revert AmountExceedsBalance();
+        unchecked {
+            recipientCancelBalance -= amount;
         }
 
         token().safeTransfer(recipient_, amount);
@@ -262,9 +270,15 @@ contract Stream is IStream, Clone {
         uint256 tokenBalance_ = tokenBalance();
 
         uint256 recipientBalance = balanceOf(recipient_);
-
-        // This overrides `withdraw` logic to allow recipient to withdraw their fair share.
-        recipientCancelBalance = recipientBalance;
+        // recipientCancelBalance_ is used to properly calculate `payerBalance` below
+        // to report an accurate payer balance in the cancellation event.
+        uint256 recipientCancelBalance_;
+        if (recipientBalance > 0) {
+            recipientCancelBalance = recipientBalance;
+            recipientCancelBalance_ = recipientBalance;
+        } else {
+            recipientCancelBalance_ = recipientCancelBalance;
+        }
 
         // This zeroing is important because without it, it's possible for recipient to obtain additional funds
         // from this contract if anyone (e.g. payer) sends it tokens after cancellation.
@@ -273,10 +287,11 @@ contract Stream is IStream, Clone {
 
         // When the stream is underfunded payer might not have an outstanding balance.
         // Calculating payer's balance using the stream's token balance also accounts for when the stream might be overfunded.
+        // `payerBalance` is used only to add information to the cancellation event below.
         uint256 payerBalance = 0;
-        if (tokenBalance_ > recipientBalance) {
+        if (tokenBalance_ > recipientCancelBalance_) {
             unchecked {
-                payerBalance = tokenBalance_ - recipientBalance;
+                payerBalance = tokenBalance_ - recipientCancelBalance_;
             }
         }
 
@@ -325,12 +340,12 @@ contract Stream is IStream, Clone {
 
         if (who == recipient()) return recipientBalance;
         if (who == payer()) {
-            uint256 tokenTotal_ = Math.max(tokenBalance(), remainingBalance);
+            uint256 tokenBalance_ = tokenBalance();
             // tokenBalance can be less than recipientBalance, e.g. when a stream is cancelled after recipient
             // accumulated vested balance, and before payer funded the stream.
-            if (tokenTotal_ > recipientBalance) {
+            if (tokenBalance_ > recipientBalance) {
                 unchecked {
-                    return tokenTotal_ - recipientBalance;
+                    return tokenBalance_ - recipientBalance;
                 }
             }
         }

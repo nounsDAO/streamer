@@ -241,6 +241,8 @@ contract StreamBalanceOfTest is StreamTest {
     }
 
     function test_balanceOf_payerBalanceDecreasesLinearlyWithTime() public {
+        token.mint(address(s), STREAM_AMOUNT);
+
         vm.warp(startTime + (DURATION / 10));
         assertEq(s.balanceOf(payer), STREAM_AMOUNT - (STREAM_AMOUNT / 10));
 
@@ -279,6 +281,10 @@ contract StreamBalanceOfTest is StreamTest {
         vm.warp(startTime + (DURATION / 2));
         expectedBalance = (STREAM_AMOUNT / 2) - withdrawnAmount;
         assertEq(s.balanceOf(recipient), expectedBalance);
+    }
+
+    function test_balanceOf_payerBalanceZeroWhenTokenBalanceIsZero() public {
+        assertEq(s.balanceOf(payer), 0);
     }
 }
 
