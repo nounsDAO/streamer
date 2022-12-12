@@ -32,6 +32,7 @@ contract Stream is IStream, Clone {
     error CallerNotPayerOrRecipient();
     error CallerNotPayer();
     error RescueTokenAmountExceedsExcessBalance();
+    error StreamNotActive();
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -47,7 +48,6 @@ contract Stream is IStream, Clone {
         address indexed msgSender,
         address indexed payer,
         address indexed recipient,
-        uint256 payerBalance,
         uint256 recipientBalance
     );
 
@@ -224,7 +224,7 @@ contract Stream is IStream, Clone {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
 
-        uint256 balance = balanceOf(recipient_);
+        uint256 balance = recipientBalance();
         if (balance < amount) revert AmountExceedsBalance();
 
         // This is safe because it should always be the case that:
@@ -246,14 +246,10 @@ contract Stream is IStream, Clone {
     function withdrawAfterCancel(uint256 amount) external onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
-        uint256 recipientCancelBalance_ = recipientCancelBalance;
 
-        if (recipientCancelBalance_ < amount) revert AmountExceedsBalance();
-        unchecked {
-            recipientCancelBalance -= amount;
-        }
-
+        recipientCancelBalance -= amount;
         token().safeTransfer(recipient_, amount);
+
         emit TokensWithdrawn(msg.sender, recipient_, amount);
     }
 
@@ -267,35 +263,20 @@ contract Stream is IStream, Clone {
     function cancel() external onlyPayerOrRecipient {
         address payer_ = payer();
         address recipient_ = recipient();
-        uint256 tokenBalance_ = tokenBalance();
 
-        uint256 recipientBalance = balanceOf(recipient_);
-        // recipientCancelBalance_ is used to properly calculate `payerBalance` below
-        // to report an accurate payer balance in the cancellation event.
-        uint256 recipientCancelBalance_;
-        if (recipientBalance > 0) {
-            recipientCancelBalance = recipientBalance;
-            recipientCancelBalance_ = recipientBalance;
-        } else {
-            recipientCancelBalance_ = recipientCancelBalance;
-        }
+        if (remainingBalance == 0) revert StreamNotActive();
+
+        uint256 recipientBalance_ = recipientBalance();
+
+        // This token amount is available to recipient to withdraw via `withdrawAfterCancel`.
+        recipientCancelBalance = recipientBalance_;
 
         // This zeroing is important because without it, it's possible for recipient to obtain additional funds
         // from this contract if anyone (e.g. payer) sends it tokens after cancellation.
         // Thanks to this state update, `balanceOf(recipient_)` will only return zero in future calls.
         remainingBalance = 0;
 
-        // When the stream is underfunded payer might not have an outstanding balance.
-        // Calculating payer's balance using the stream's token balance also accounts for when the stream might be overfunded.
-        // `payerBalance` is used only to add information to the cancellation event below.
-        uint256 payerBalance = 0;
-        if (tokenBalance_ > recipientCancelBalance_) {
-            unchecked {
-                payerBalance = tokenBalance_ - recipientCancelBalance_;
-            }
-        }
-
-        emit StreamCancelled(msg.sender, payer_, recipient_, payerBalance, recipientBalance);
+        emit StreamCancelled(msg.sender, payer_, recipient_, recipientBalance_);
     }
 
     /**
@@ -331,60 +312,11 @@ contract Stream is IStream, Clone {
      */
 
     /**
-     * @notice Returns the available funds to withdraw.
-     * @param who The address for which to query the balance.
-     * @return uint256 The total funds allocated to `who` as uint256.
-     */
-    function balanceOf(address who) public view returns (uint256) {
-        uint256 recipientBalance = _recipientBalance();
-
-        if (who == recipient()) return recipientBalance;
-        if (who == payer()) {
-            uint256 tokenBalance_ = tokenBalance();
-            // tokenBalance can be less than recipientBalance, e.g. when a stream is cancelled after recipient
-            // accumulated vested balance, and before payer funded the stream.
-            if (tokenBalance_ > recipientBalance) {
-                unchecked {
-                    return tokenBalance_ - recipientBalance;
-                }
-            }
-        }
-        return 0;
-    }
-
-    /**
-     * @notice Returns the time elapsed in this stream, or zero if it hasn't started yet.
-     */
-    function elapsedTime() public view returns (uint256) {
-        uint256 startTime_ = startTime();
-        if (block.timestamp <= startTime_) return 0;
-
-        uint256 stopTime_ = stopTime();
-        if (block.timestamp < stopTime_) return block.timestamp - startTime_;
-
-        return stopTime_ - startTime_;
-    }
-
-    /**
-     * @notice Get this stream's token balance vs the token amount required to meet the commitment
-     * to recipient.
-     */
-    function tokenAndOutstandingBalance() public view returns (uint256, uint256) {
-        return (tokenBalance(), remainingBalance);
-    }
-
-    /**
-     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-     *   INTERNAL FUNCTIONS
-     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-     */
-
-    /**
      * @dev Helper function for `balanceOf` in calculating recipient's fair share of tokens, taking withdrawals into account.
      * When a stream is cancelled the balance will be `recipientCancelBalance` until it's fully withdrawan, then
      * it will remain at zero.
      */
-    function _recipientBalance() internal view returns (uint256) {
+    function recipientBalance() public view returns (uint256) {
         uint256 startTime_ = startTime();
         uint256 blockTime = block.timestamp;
 
@@ -427,6 +359,33 @@ contract Stream is IStream, Clone {
 
         return balance;
     }
+
+    /**
+     * @notice Returns the time elapsed in this stream, or zero if it hasn't started yet.
+     */
+    function elapsedTime() public view returns (uint256) {
+        uint256 startTime_ = startTime();
+        if (block.timestamp <= startTime_) return 0;
+
+        uint256 stopTime_ = stopTime();
+        if (block.timestamp < stopTime_) return block.timestamp - startTime_;
+
+        return stopTime_ - startTime_;
+    }
+
+    /**
+     * @notice Get this stream's token balance vs the token amount required to meet the commitment
+     * to recipient.
+     */
+    function tokenAndOutstandingBalance() public view returns (uint256, uint256) {
+        return (tokenBalance(), remainingBalance);
+    }
+
+    /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   INTERNAL FUNCTIONS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
 
     /**
      * @dev Helper function that makes the rest of the code look nicer.

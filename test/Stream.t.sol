@@ -24,7 +24,6 @@ contract StreamTest is Test {
         address indexed msgSender,
         address indexed payer,
         address indexed recipient,
-        uint256 payerBalance,
         uint256 recipientBalance
     );
 
@@ -92,7 +91,7 @@ contract StreamWithdrawTest is StreamTest {
 
     function test_withdraw_revertsWhenAmountExceedsBalance() public {
         vm.warp(startTime + 1);
-        uint256 balance = s.balanceOf(recipient);
+        uint256 balance = s.recipientBalance();
 
         vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
         vm.prank(recipient);
@@ -101,7 +100,7 @@ contract StreamWithdrawTest is StreamTest {
 
     function test_withdraw_revertsWhenStreamNotFunded() public {
         vm.warp(startTime + 1);
-        uint256 balance = s.balanceOf(recipient);
+        uint256 balance = s.recipientBalance();
 
         vm.expectRevert("ERC20: transfer amount exceeds balance");
         vm.prank(recipient);
@@ -196,13 +195,13 @@ contract StreamWithdrawTest is StreamTest {
         vm.warp(startTime + (DURATION / 2));
 
         vm.expectEmit(true, true, true, true);
-        emit StreamCancelled(address(rRecipient), payer, address(rRecipient), STREAM_AMOUNT / 2, 0);
+        emit StreamCancelled(address(rRecipient), payer, address(rRecipient), 0);
 
         vm.prank(address(rRecipient));
         s.withdraw(STREAM_AMOUNT / 2);
 
         assertEq(rToken.balanceOf(address(rRecipient)), STREAM_AMOUNT / 2);
-        assertEq(s.balanceOf(payer), STREAM_AMOUNT / 2);
+        // assertEq(s.balanceOf(payer), STREAM_AMOUNT / 2);
     }
 }
 
@@ -218,42 +217,21 @@ contract StreamBalanceOfTest is StreamTest {
     }
 
     function test_balanceOf_zeroBeforeStreamStarts() public {
-        assertEq(s.balanceOf(recipient), 0);
-    }
-
-    function test_balanceOf_zeroForNonPayerOrRecipient() public {
-        vm.warp(stopTime);
-        assertEq(s.balanceOf(address(0x4242)), 0);
+        assertEq(s.recipientBalance(), 0);
     }
 
     function test_balanceOf_recipientBalanceIncreasesLinearlyWithTime() public {
         vm.warp(startTime + (DURATION / 10));
-        assertEq(s.balanceOf(recipient), STREAM_AMOUNT / 10);
+        assertEq(s.recipientBalance(), STREAM_AMOUNT / 10);
 
         vm.warp(startTime + (DURATION / 5));
-        assertEq(s.balanceOf(recipient), STREAM_AMOUNT / 5);
+        assertEq(s.recipientBalance(), STREAM_AMOUNT / 5);
 
         vm.warp(startTime + (DURATION / 2));
-        assertEq(s.balanceOf(recipient), STREAM_AMOUNT / 2);
+        assertEq(s.recipientBalance(), STREAM_AMOUNT / 2);
 
         vm.warp(stopTime);
-        assertEq(s.balanceOf(recipient), STREAM_AMOUNT);
-    }
-
-    function test_balanceOf_payerBalanceDecreasesLinearlyWithTime() public {
-        token.mint(address(s), STREAM_AMOUNT);
-
-        vm.warp(startTime + (DURATION / 10));
-        assertEq(s.balanceOf(payer), STREAM_AMOUNT - (STREAM_AMOUNT / 10));
-
-        vm.warp(startTime + (DURATION / 5));
-        assertEq(s.balanceOf(payer), STREAM_AMOUNT - (STREAM_AMOUNT / 5));
-
-        vm.warp(startTime + (DURATION / 2));
-        assertEq(s.balanceOf(payer), STREAM_AMOUNT / 2);
-
-        vm.warp(stopTime);
-        assertEq(s.balanceOf(payer), 0);
+        assertEq(s.recipientBalance(), STREAM_AMOUNT);
     }
 
     function test_balanceOf_takesWithdrawalsIntoAccount() public {
@@ -262,29 +240,25 @@ contract StreamBalanceOfTest is StreamTest {
 
         vm.warp(startTime + (DURATION / 10));
         uint256 expectedBalance = STREAM_AMOUNT / 10;
-        assertEq(s.balanceOf(recipient), expectedBalance);
+        assertEq(s.recipientBalance(), expectedBalance);
 
         vm.prank(recipient);
         s.withdraw(expectedBalance);
-        assertEq(s.balanceOf(recipient), 0);
+        assertEq(s.recipientBalance(), 0);
         withdrawnAmount += expectedBalance;
 
         vm.warp(startTime + (DURATION / 5));
         expectedBalance = (STREAM_AMOUNT / 5) - withdrawnAmount;
-        assertEq(s.balanceOf(recipient), expectedBalance);
+        assertEq(s.recipientBalance(), expectedBalance);
 
         vm.prank(recipient);
         s.withdraw(expectedBalance - 1);
-        assertEq(s.balanceOf(recipient), 1);
+        assertEq(s.recipientBalance(), 1);
         withdrawnAmount += expectedBalance - 1;
 
         vm.warp(startTime + (DURATION / 2));
         expectedBalance = (STREAM_AMOUNT / 2) - withdrawnAmount;
-        assertEq(s.balanceOf(recipient), expectedBalance);
-    }
-
-    function test_balanceOf_payerBalanceZeroWhenTokenBalanceIsZero() public {
-        assertEq(s.balanceOf(payer), 0);
+        assertEq(s.recipientBalance(), expectedBalance);
     }
 }
 
@@ -310,7 +284,7 @@ contract StreamCancelTest is StreamTest {
         assertEq(token.balanceOf(recipient), 0);
 
         vm.expectEmit(true, true, true, true);
-        emit StreamCancelled(payer, payer, recipient, STREAM_AMOUNT, 0);
+        emit StreamCancelled(payer, payer, recipient, 0);
         vm.prank(payer);
         s.cancel();
 
@@ -331,7 +305,7 @@ contract StreamCancelTest is StreamTest {
         vm.warp(stopTime);
 
         vm.expectEmit(true, true, true, true);
-        emit StreamCancelled(payer, payer, recipient, 0, STREAM_AMOUNT);
+        emit StreamCancelled(payer, payer, recipient, STREAM_AMOUNT);
         vm.prank(payer);
         s.cancel();
 
@@ -357,14 +331,11 @@ contract StreamCancelTest is StreamTest {
         uint256 expectedPayerBalance = STREAM_AMOUNT - expectedRecipientBalance;
 
         vm.expectEmit(true, true, true, true);
-        emit StreamCancelled(
-            payer, payer, recipient, expectedPayerBalance, expectedRecipientBalance
-            );
+        emit StreamCancelled(payer, payer, recipient, expectedRecipientBalance);
         vm.prank(payer);
         s.cancel();
 
-        assertEq(s.balanceOf(payer), expectedPayerBalance);
-        assertEq(s.balanceOf(recipient), expectedRecipientBalance);
+        assertEq(s.recipientBalance(), expectedRecipientBalance);
 
         vm.prank(payer);
         s.recoverTokens(address(token), expectedPayerBalance);
@@ -400,7 +371,7 @@ contract StreamCancelTest is StreamTest {
         assertEq(token.balanceOf(recipient), 0);
         vm.warp(startTime + elapsedTime);
 
-        uint256 withdrawAmount = (withdrawalsPercents * s.balanceOf(recipient)) / 100;
+        uint256 withdrawAmount = (withdrawalsPercents * s.recipientBalance()) / 100;
         vm.prank(recipient);
         s.withdraw(withdrawAmount);
         assertEq(token.balanceOf(recipient), withdrawAmount);
@@ -410,9 +381,7 @@ contract StreamCancelTest is StreamTest {
         uint256 expectedRecipientBalance = expectedRecipientBalanceBeforeWithdrawal - withdrawAmount;
 
         vm.expectEmit(true, true, true, true);
-        emit StreamCancelled(
-            payer, payer, recipient, expectedPayerBalance, expectedRecipientBalance
-            );
+        emit StreamCancelled(payer, payer, recipient, expectedRecipientBalance);
         vm.prank(payer);
         s.cancel();
 
@@ -435,7 +404,7 @@ contract StreamCancelTest is StreamTest {
         assertEq(token.balanceOf(recipient), 0);
 
         vm.expectEmit(true, true, true, true);
-        emit StreamCancelled(payer, payer, recipient, fundedAmount, 0);
+        emit StreamCancelled(payer, payer, recipient, 0);
         vm.prank(payer);
         s.cancel();
 
@@ -443,7 +412,7 @@ contract StreamCancelTest is StreamTest {
         s.recoverTokens(address(token), fundedAmount);
         assertEq(token.balanceOf(payer), fundedAmount);
 
-        assertEq(s.balanceOf(recipient), 0);
+        assertEq(s.recipientBalance(), 0);
     }
 
     function test_cancel_returnsOverfundedTokenBalanceToPayer() public {
@@ -453,7 +422,7 @@ contract StreamCancelTest is StreamTest {
         assertEq(token.balanceOf(recipient), 0);
 
         vm.expectEmit(true, true, true, true);
-        emit StreamCancelled(payer, payer, recipient, fundedAmount, 0);
+        emit StreamCancelled(payer, payer, recipient, 0);
         vm.prank(payer);
         s.cancel();
 
@@ -461,7 +430,7 @@ contract StreamCancelTest is StreamTest {
         s.recoverTokens(address(token), fundedAmount);
         assertEq(token.balanceOf(payer), fundedAmount);
 
-        assertEq(s.balanceOf(recipient), 0);
+        assertEq(s.recipientBalance(), 0);
     }
 
     function test_cancel_sendsFairSharePerElapsedTimeAndWithdrawalsAndOverfunding() public {
@@ -488,7 +457,7 @@ contract StreamCancelTest is StreamTest {
         assertEq(token.balanceOf(recipient), 0);
         vm.warp(startTime + elapsedTime);
 
-        uint256 withdrawAmount = (withdrawalsPercents * s.balanceOf(recipient)) / 100;
+        uint256 withdrawAmount = (withdrawalsPercents * s.recipientBalance()) / 100;
 
         vm.prank(recipient);
         s.withdraw(withdrawAmount);
@@ -500,14 +469,11 @@ contract StreamCancelTest is StreamTest {
         uint256 expectedRecipientBalance = expectedRecipientBalanceBeforeWithdrawal - withdrawAmount;
 
         vm.expectEmit(true, true, true, true);
-        emit StreamCancelled(
-            payer, payer, recipient, expectedPayerBalance, expectedRecipientBalance
-            );
+        emit StreamCancelled(payer, payer, recipient, expectedRecipientBalance);
         vm.prank(payer);
         s.cancel();
 
-        assertEq(s.balanceOf(recipient), expectedRecipientBalance);
-        assertEq(s.balanceOf(payer), expectedPayerBalance);
+        assertEq(s.recipientBalance(), expectedRecipientBalance);
 
         vm.prank(payer);
         s.recoverTokens(address(token), expectedPayerBalance);
@@ -531,18 +497,13 @@ contract StreamCancelTest is StreamTest {
         s.withdraw(1);
     }
 
-    function test_cancel_onceCancelledRecipientCantCancelToGetFutureTokensAccidentallySent()
-        public
-    {
+    function test_cancel_revertsUponSecondCancel() public {
         vm.prank(payer);
         s.cancel();
 
-        vm.warp(stopTime);
-        token.mint(address(s), STREAM_AMOUNT);
-
+        vm.expectRevert(abi.encodeWithSelector(Stream.StreamNotActive.selector));
         vm.prank(recipient);
         s.cancel();
-        assertEq(token.balanceOf(recipient), 0);
     }
 }
 
@@ -616,10 +577,10 @@ contract StreamWithRemainderTest is StreamTest {
 
     function test_balanceOf_usesRateDecimalsMidStream() public {
         vm.warp(startTime + 150);
-        assertEq(s.balanceOf(recipient), 999999999);
+        assertEq(s.recipientBalance(), 999999999);
 
         vm.warp(startTime + 200);
-        assertEq(s.balanceOf(recipient), 1333333333);
+        assertEq(s.recipientBalance(), 1333333333);
     }
 
     function test_withdraw_usesRateDecimalsMidStream() public {
@@ -646,7 +607,7 @@ contract StreamWithRemainderTest is StreamTest {
 
     function test_balanceOf_noDustAtEndOfStream() public {
         vm.warp(stopTime);
-        assertEq(s.balanceOf(recipient), s.tokenAmount());
+        assertEq(s.recipientBalance(), s.tokenAmount());
     }
 
     function test_withdraw_noDustAtEndOfStream() public {
@@ -683,10 +644,10 @@ contract StreamWithRemainderHighDurationAndAmountTest is StreamTest {
 
     function test_balanceOf_usesRateDecimalsMidStream() public {
         vm.warp(startTime + 7890000); // half way in
-        assertEq(s.balanceOf(recipient), 499999999999);
+        assertEq(s.recipientBalance(), 499999999999);
 
         vm.warp(startTime + 10520000); // two thirds in
-        assertEq(s.balanceOf(recipient), 666666666666);
+        assertEq(s.recipientBalance(), 666666666666);
     }
 
     function test_withdraw_usesRateDecimalsMidStream() public {
@@ -713,7 +674,7 @@ contract StreamWithRemainderHighDurationAndAmountTest is StreamTest {
 
     function test_balanceOf_noDustAtEndOfStream() public {
         vm.warp(stopTime);
-        assertEq(s.balanceOf(recipient), s.tokenAmount());
+        assertEq(s.recipientBalance(), s.tokenAmount());
     }
 
     function test_withdraw_noDustAtEndOfStream() public {
