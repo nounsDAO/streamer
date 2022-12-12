@@ -273,7 +273,7 @@ contract StreamFactoryTest is Test {
         vm.expectRevert(abi.encodeWithSelector(StreamFactory.UnexpectedStreamAddress.selector));
         // changing stopTime to result in a different address
         factory.createStream(
-            recipient, tokenAmount, address(token), startTime, stopTime - 1, predictedAddress
+            recipient, tokenAmount, address(token), startTime, stopTime - 1, 0, predictedAddress
         );
     }
 
@@ -293,7 +293,7 @@ contract StreamFactoryTest is Test {
         );
 
         address streamAddress = factory.createStream(
-            recipient, tokenAmount, address(token), startTime, stopTime, predictedAddress
+            recipient, tokenAmount, address(token), startTime, stopTime, 0, predictedAddress
         );
 
         assertEq(predictedAddress, streamAddress);

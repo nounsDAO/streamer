@@ -149,6 +149,7 @@ contract StreamFactory {
      * @param tokenAddress the contract address of the payment token.
      * @param startTime the unix timestamp for when the stream starts.
      * @param stopTime the unix timestamp for when the stream ends.
+     * @param nonce the nonce for this stream creation.
      * @param predictedStreamAddress the expected stream address the user got from calling the predict function.
      * @return stream the address of the new stream contract.
      */
@@ -158,10 +159,12 @@ contract StreamFactory {
         address tokenAddress,
         uint256 startTime,
         uint256 stopTime,
+        uint8 nonce,
         address predictedStreamAddress
     ) external returns (address stream) {
-        stream =
-            createStream(msg.sender, recipient, tokenAmount, tokenAddress, startTime, stopTime, 0);
+        stream = createStream(
+            msg.sender, recipient, tokenAmount, tokenAddress, startTime, stopTime, nonce
+        );
         if (stream != predictedStreamAddress) revert UnexpectedStreamAddress();
     }
 
