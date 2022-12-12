@@ -57,12 +57,6 @@ contract Stream is IStream, Clone {
      */
 
     /**
-     * @notice Used to add precision to `ratePerSecond`, to minimize the impact of rounding down.
-     * See `ratePerSecond()` implementation for more information.
-     */
-    uint256 public constant RATE_DECIMALS_MULTIPLIER = 1e6;
-
-    /**
      * @notice Get the address of the factory contract that cloned this Stream instance.
      * @dev Uses clone-with-immutable-args to read the value from the contract's code region rather than state to save gas.
      */
@@ -116,25 +110,6 @@ contract Stream is IStream, Clone {
      */
     function stopTime() public pure returns (uint256) {
         return _getArgUint256(144);
-    }
-
-    /**
-     * @notice Get this stream's token streaming rate per second.
-     * @dev Uses clone-with-immutable-args to read the value from the contract's code region rather than state to save gas.
-     */
-    function ratePerSecond() public pure returns (uint256) {
-        uint256 duration = stopTime() - startTime();
-
-        unchecked {
-            // ratePerSecond can lose precision as its being rounded down here
-            // the value lost in rounding down results in less income per second for recipient
-            // max round down impact is duration - 1; e.g. one year, that's 31_557_599
-            // e.g. using USDC (w/ 6 decimals) that's ~32 USDC
-            // since ratePerSecond has 6 decimals, 31_557_599 / 1e6 = 0.00003156; round down impact becomes negligible
-            // finally, this remainder dust becomes available to recipient when stream duration is fully elapsed
-            // see `_recipientBalance` where `blockTime >= stopTime`
-            return RATE_DECIMALS_MULTIPLIER * tokenAmount() / duration;
-        }
     }
 
     /**

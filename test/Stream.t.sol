@@ -577,10 +577,6 @@ contract StreamWithRemainderTest is StreamTest {
                 payer, recipient, streamAmount, address(token), startTime, stopTime
             )
         );
-
-        // streamAmount / duration = 6666666.66666667
-        // assuming RATE_DECIMALS_MULTIPLIER = 6, we get 6666666666666
-        assertEq(s.ratePerSecond(), 6666666666666);
     }
 
     function test_balanceOf_worksMidStream() public {
@@ -644,10 +640,6 @@ contract StreamWithRemainderHighDurationAndAmountTest is StreamTest {
                 payer, recipient, streamAmount, address(token), startTime, stopTime
             )
         );
-
-        // streamAmount / duration = 63371.35614702
-        // assuming RATE_DECIMALS_MULTIPLIER = 1e6, we get 63371356147
-        assertEq(s.ratePerSecond(), 63371356147);
     }
 
     function test_balanceOf_worksMidStream() public {

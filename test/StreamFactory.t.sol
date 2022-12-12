@@ -356,7 +356,6 @@ contract StreamFactoryCreatesCorrectStreamTest is Test {
         );
 
         assertEq(s.tokenAmount(), STREAM_AMOUNT);
-        assertEq(s.ratePerSecond(), 2 * s.RATE_DECIMALS_MULTIPLIER());
         assertEq(s.startTime(), startTime);
         assertEq(s.stopTime(), stopTime);
         assertEq(s.recipient(), recipient);
