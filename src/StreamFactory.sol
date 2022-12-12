@@ -31,7 +31,6 @@ contract StreamFactory {
     error RecipientIsAddressZero();
     error TokenAmountIsZero();
     error DurationMustBePositive();
-    error TokenAmountLessThanDuration();
     error UnexpectedStreamAddress();
 
     /**
@@ -197,7 +196,6 @@ contract StreamFactory {
         if (recipient == address(0)) revert RecipientIsAddressZero();
         if (tokenAmount == 0) revert TokenAmountIsZero();
         if (stopTime <= startTime) revert DurationMustBePositive();
-        if (tokenAmount < stopTime - startTime) revert TokenAmountLessThanDuration();
 
         stream = streamImplementation.cloneDeterministic(
             encodeData(payer, recipient, tokenAmount, tokenAddress, startTime, stopTime),
