@@ -273,6 +273,7 @@ contract Stream is IStream, Clone {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
 
+        // Reverts if amount > recipientCancelBalance
         recipientCancelBalance -= amount;
         token().safeTransfer(recipient_, amount);
 
