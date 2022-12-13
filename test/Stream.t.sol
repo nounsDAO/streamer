@@ -543,6 +543,55 @@ contract StreamCancelTest is StreamTest {
         vm.prank(recipient);
         s.cancel();
     }
+
+    function test_withdrawAfterCancel_revertsWhenCalledByNonPayerOrRecipient() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.CallerNotPayerOrRecipient.selector));
+        s.withdrawAfterCancel(1);
+    }
+
+    function test_withdrawAfterCancel_revertsGivenZeroAmount() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.CantWithdrawZero.selector));
+        vm.prank(recipient);
+        s.withdrawAfterCancel(0);
+    }
+
+    function test_withdrawAfterCancel_revertsGivenNoCancelBalance() public {
+        vm.expectRevert(stdError.arithmeticError);
+        vm.prank(recipient);
+        s.withdrawAfterCancel(1);
+    }
+
+    function test_withdrawAfterCancel_transfersAndEmits() public {
+        token.mint(address(s), STREAM_AMOUNT);
+        vm.warp(startTime + (DURATION / 2));
+        vm.startPrank(recipient);
+        s.cancel();
+        uint256 cancelBalance = s.recipientCancelBalance();
+
+        vm.expectRevert(stdError.arithmeticError);
+        s.withdrawAfterCancel(cancelBalance + 1);
+
+        vm.expectEmit(true, true, true, true);
+        emit TokensWithdrawn(recipient, recipient, cancelBalance);
+
+        s.withdrawAfterCancel(cancelBalance);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(recipient), cancelBalance);
+    }
+
+    function test_withdrawAfterCancel_worksWhenPayerExecutes() public {
+        token.mint(address(s), STREAM_AMOUNT);
+        vm.warp(startTime + (DURATION / 2));
+        vm.startPrank(payer);
+        s.cancel();
+        uint256 cancelBalance = s.recipientCancelBalance();
+
+        s.withdrawAfterCancel(cancelBalance);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(recipient), cancelBalance);
+    }
 }
 
 contract StreamTokenAndOutstandingBalanceTest is StreamTest {
