@@ -238,22 +238,6 @@ contract Stream is IStream, Clone {
     }
 
     /**
-     * @notice Withdraw tokens to recipient's account after the stream has been cancelled.
-     * Execution fails if the requested amount is greater than recipient's withdrawable balance.
-     * Only this stream's payer or recipient can call this function.
-     * @param amount the amount of tokens to withdraw.
-     */
-    function withdrawAfterCancel(uint256 amount) external onlyPayerOrRecipient {
-        if (amount == 0) revert CantWithdrawZero();
-        address recipient_ = recipient();
-
-        recipientCancelBalance -= amount;
-        token().safeTransfer(recipient_, amount);
-
-        emit TokensWithdrawn(msg.sender, recipient_, amount);
-    }
-
-    /**
      * @notice Cancel the stream and update recipient's fair share of the funds to their current balance.
      * Each party must take additional action to withdraw their funds:
      * recipient must call `withdraw`.
@@ -277,6 +261,22 @@ contract Stream is IStream, Clone {
         remainingBalance = 0;
 
         emit StreamCancelled(msg.sender, payer_, recipient_, recipientBalance_);
+    }
+
+    /**
+     * @notice Withdraw tokens to recipient's account after the stream has been cancelled.
+     * Execution fails if the requested amount is greater than recipient's withdrawable balance.
+     * Only this stream's payer or recipient can call this function.
+     * @param amount the amount of tokens to withdraw.
+     */
+    function withdrawAfterCancel(uint256 amount) external onlyPayerOrRecipient {
+        if (amount == 0) revert CantWithdrawZero();
+        address recipient_ = recipient();
+
+        recipientCancelBalance -= amount;
+        token().safeTransfer(recipient_, amount);
+
+        emit TokensWithdrawn(msg.sender, recipient_, amount);
     }
 
     /**
@@ -310,6 +310,27 @@ contract Stream is IStream, Clone {
      *   VIEW FUNCTIONS
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
+
+    /**
+     * @notice Returns the time elapsed in this stream, or zero if it hasn't started yet.
+     */
+    function elapsedTime() public view returns (uint256) {
+        uint256 startTime_ = startTime();
+        if (block.timestamp <= startTime_) return 0;
+
+        uint256 stopTime_ = stopTime();
+        if (block.timestamp < stopTime_) return block.timestamp - startTime_;
+
+        return stopTime_ - startTime_;
+    }
+
+    /**
+     * @notice Get this stream's token balance vs the token amount required to meet the commitment
+     * to recipient.
+     */
+    function tokenAndOutstandingBalance() public view returns (uint256, uint256) {
+        return (tokenBalance(), remainingBalance);
+    }
 
     /**
      * @dev Helper function for `balanceOf` in calculating recipient's fair share of tokens, taking withdrawals into account.
@@ -358,27 +379,6 @@ contract Stream is IStream, Clone {
         }
 
         return balance;
-    }
-
-    /**
-     * @notice Returns the time elapsed in this stream, or zero if it hasn't started yet.
-     */
-    function elapsedTime() public view returns (uint256) {
-        uint256 startTime_ = startTime();
-        if (block.timestamp <= startTime_) return 0;
-
-        uint256 stopTime_ = stopTime();
-        if (block.timestamp < stopTime_) return block.timestamp - startTime_;
-
-        return stopTime_ - startTime_;
-    }
-
-    /**
-     * @notice Get this stream's token balance vs the token amount required to meet the commitment
-     * to recipient.
-     */
-    function tokenAndOutstandingBalance() public view returns (uint256, uint256) {
-        return (tokenBalance(), remainingBalance);
     }
 
     /**
