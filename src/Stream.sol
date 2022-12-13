@@ -243,6 +243,7 @@ contract Stream is IStream, Clone {
      * recipient must call `withdrawAfterCancel`.
      * payer must call `recoverTokens`.
      * Only this stream's payer or recipient can call this function.
+     * Reverts if executed after recipient has withdrawn the full stream amount, or if executed more than once.
      */
     function cancel() external onlyPayerOrRecipient {
         address payer_ = payer();
