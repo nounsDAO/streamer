@@ -278,7 +278,7 @@ contract StreamCancelTest is StreamTest {
         s.cancel();
     }
 
-    function test_cancel_payerCanWithdrawEverythingBeforeTimeElapses() public {
+    function test_cancel_payerCanRecoverEverythingBeforeStartTime() public {
         token.mint(address(s), STREAM_AMOUNT);
         assertEq(token.balanceOf(payer), 0);
         assertEq(token.balanceOf(recipient), 0);
@@ -318,15 +318,17 @@ contract StreamCancelTest is StreamTest {
 
         vm.startPrank(recipient);
         vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
-        s.withdraw(STREAM_AMOUNT);
+        s.withdraw(1);
 
         s.withdrawAfterCancel(STREAM_AMOUNT);
         assertEq(token.balanceOf(recipient), STREAM_AMOUNT);
         vm.stopPrank();
     }
 
-    function test_cancel_sendsFairSharePerElapsedTimeNoWithdrawals(uint256 elapsedTime) public {
-        vm.assume(elapsedTime <= DURATION);
+    function test_cancel_allocatesFairSharePerElapsedTimeNoWithdrawals(uint256 elapsedTime)
+        public
+    {
+        elapsedTime = bound(elapsedTime, 0, DURATION);
         token.mint(address(s), STREAM_AMOUNT);
         assertEq(token.balanceOf(payer), 0);
         assertEq(token.balanceOf(recipient), 0);
@@ -348,7 +350,7 @@ contract StreamCancelTest is StreamTest {
         if (expectedRecipientBalance > 0) {
             vm.startPrank(recipient);
             vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
-            s.withdraw(expectedRecipientBalance);
+            s.withdraw(1);
 
             s.withdrawAfterCancel(expectedRecipientBalance);
             vm.stopPrank();
@@ -358,10 +360,10 @@ contract StreamCancelTest is StreamTest {
         assertEq(token.balanceOf(recipient), expectedRecipientBalance);
     }
 
-    function test_cancel_sendsFairSharePerElapsedTimeAndWithdrawals(
-        uint256 elapsedTime,
-        uint256 withdrawalsPercents
-    ) public {
+    function test_cancel_allocatesFairSharePerElapsedTimeAndWithdrawals() public {
+        uint256 elapsedTime = 1000;
+        uint256 withdrawalsPercents = 100;
+
         uint256 DECIMALS_FACTOR = 1e6;
         uint256 streamAmount = STREAM_AMOUNT * DECIMALS_FACTOR;
         s = Stream(
@@ -372,8 +374,8 @@ contract StreamCancelTest is StreamTest {
 
         uint256 ratePerSecond = streamAmount / DURATION;
         uint256 minElapsedSecondsSoOnePercentIsntZero = 100 * DECIMALS_FACTOR / ratePerSecond;
-        vm.assume(elapsedTime > minElapsedSecondsSoOnePercentIsntZero && elapsedTime <= DURATION);
-        vm.assume(withdrawalsPercents > 0 && withdrawalsPercents <= 100);
+        elapsedTime = bound(elapsedTime, minElapsedSecondsSoOnePercentIsntZero, DURATION);
+        withdrawalsPercents = bound(withdrawalsPercents, 1, 100);
 
         token.mint(address(s), streamAmount);
         assertEq(token.balanceOf(payer), 0);
@@ -389,8 +391,14 @@ contract StreamCancelTest is StreamTest {
         uint256 expectedPayerBalance = streamAmount - expectedRecipientBalanceBeforeWithdrawal;
         uint256 expectedRecipientBalance = expectedRecipientBalanceBeforeWithdrawal - withdrawAmount;
 
-        vm.expectEmit(true, true, true, true);
-        emit StreamCancelled(payer, payer, recipient, expectedRecipientBalance);
+        if (withdrawAmount != streamAmount) {
+            vm.expectEmit(true, true, true, true);
+            emit StreamCancelled(payer, payer, recipient, expectedRecipientBalance);
+        } else {
+            // cancel reverts when recipient has no more balance.
+            // this is to ensure cancel only executes when relevant and once per stream.
+            vm.expectRevert(abi.encodeWithSelector(Stream.StreamNotActive.selector));
+        }
         vm.prank(payer);
         s.cancel();
 
@@ -400,7 +408,7 @@ contract StreamCancelTest is StreamTest {
         if (expectedRecipientBalance > 0) {
             vm.startPrank(recipient);
             vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
-            s.withdraw(expectedRecipientBalance);
+            s.withdraw(1);
 
             s.withdrawAfterCancel(expectedRecipientBalance);
             vm.stopPrank();
@@ -410,7 +418,7 @@ contract StreamCancelTest is StreamTest {
         assertEq(token.balanceOf(recipient), expectedRecipientBalanceBeforeWithdrawal);
     }
 
-    function test_cancel_returnsOnlyTokenBalanceToPayerIfNotFullyFunded() public {
+    function test_cancel_allocatesOnlyTokenBalanceToPayerWhenUnderfunded() public {
         uint256 fundedAmount = STREAM_AMOUNT - 1;
         token.mint(address(s), fundedAmount);
         assertEq(token.balanceOf(payer), 0);
@@ -421,11 +429,16 @@ contract StreamCancelTest is StreamTest {
         vm.prank(payer);
         s.cancel();
 
-        vm.prank(payer);
+        assertEq(s.recipientBalance(), 0);
+
+        vm.startPrank(payer);
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        s.recoverTokens(address(token), fundedAmount + 1);
+
         s.recoverTokens(address(token), fundedAmount);
         assertEq(token.balanceOf(payer), fundedAmount);
 
-        assertEq(s.recipientBalance(), 0);
+        vm.stopPrank();
     }
 
     function test_cancel_returnsOverfundedTokenBalanceToPayer() public {
@@ -439,18 +452,18 @@ contract StreamCancelTest is StreamTest {
         vm.prank(payer);
         s.cancel();
 
+        assertEq(s.recipientBalance(), 0);
+
         vm.prank(payer);
         s.recoverTokens(address(token), fundedAmount);
         assertEq(token.balanceOf(payer), fundedAmount);
-
-        assertEq(s.recipientBalance(), 0);
     }
 
-    function test_cancel_sendsFairSharePerElapsedTimeAndWithdrawalsAndOverfunding() public {
-        uint256 elapsedTime = 51;
-        uint256 withdrawalsPercents = 1;
-        uint256 overfundingAmount = 1;
-
+    function test_cancel_sendsFairSharePerElapsedTimeAndWithdrawalsAndOverfunding(
+        uint256 elapsedTime,
+        uint256 withdrawalsPercents,
+        uint256 overfundingAmount
+    ) public {
         uint256 DECIMALS_FACTOR = 1e6;
         uint256 streamAmount = STREAM_AMOUNT * DECIMALS_FACTOR;
         s = Stream(
@@ -461,9 +474,9 @@ contract StreamCancelTest is StreamTest {
 
         uint256 ratePerSecond = streamAmount / DURATION;
         uint256 minElapsedSecondsSoOnePercentIsntZero = 100 * DECIMALS_FACTOR / ratePerSecond;
-        vm.assume(elapsedTime > minElapsedSecondsSoOnePercentIsntZero && elapsedTime <= DURATION);
-        vm.assume(withdrawalsPercents > 0 && withdrawalsPercents <= 100);
-        vm.assume(overfundingAmount > 0 && overfundingAmount <= type(uint256).max - streamAmount);
+        elapsedTime = bound(elapsedTime, minElapsedSecondsSoOnePercentIsntZero, DURATION);
+        withdrawalsPercents = bound(withdrawalsPercents, 1, 100);
+        overfundingAmount = bound(overfundingAmount, 1, type(uint256).max - streamAmount);
 
         token.mint(address(s), streamAmount + overfundingAmount);
         assertEq(token.balanceOf(payer), 0);
@@ -493,9 +506,16 @@ contract StreamCancelTest is StreamTest {
         s.recoverTokens(address(token), expectedPayerBalance);
 
         vm.startPrank(recipient);
-        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        if (expectedRecipientBalance > 0) {
+            vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
+        } else {
+            vm.expectRevert(abi.encodeWithSelector(Stream.CantWithdrawZero.selector));
+        }
         s.withdraw(expectedRecipientBalance);
 
+        if (expectedRecipientBalance == 0) {
+            vm.expectRevert(abi.encodeWithSelector(Stream.CantWithdrawZero.selector));
+        }
         s.withdrawAfterCancel(expectedRecipientBalance);
         vm.stopPrank();
 
