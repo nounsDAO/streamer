@@ -333,9 +333,9 @@ contract Stream is IStream, Clone {
     }
 
     /**
-     * @dev Helper function for `balanceOf` in calculating recipient's fair share of tokens, taking withdrawals into account.
-     * When a stream is cancelled the balance will be `recipientCancelBalance` until it's fully withdrawan, then
-     * it will remain at zero.
+     * @notice Get this stream's recipient's balance, taking into account vesting over time and withdrawals.
+     * When a stream is cancelled this function always returns zero, to make sure that `withdraw` no longer sends any funds.
+     * To learn the recipient's balance post-cancel use `recipientCancelBalance`.
      */
     function recipientBalance() public view returns (uint256) {
         uint256 startTime_ = startTime();
