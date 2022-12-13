@@ -343,9 +343,6 @@ contract Stream is IStream, Clone {
 
         if (blockTime <= startTime_) return 0;
 
-        uint256 recipientCancelBalance_ = recipientCancelBalance;
-        if (recipientCancelBalance_ > 0) return recipientCancelBalance_;
-
         uint256 tokenAmount_ = tokenAmount();
         uint256 balance;
         if (blockTime >= stopTime()) {

@@ -316,9 +316,13 @@ contract StreamCancelTest is StreamTest {
         s.recoverTokens(address(token), 1);
         assertEq(token.balanceOf(payer), 0);
 
-        vm.prank(recipient);
+        vm.startPrank(recipient);
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
         s.withdraw(STREAM_AMOUNT);
+
+        s.withdrawAfterCancel(STREAM_AMOUNT);
         assertEq(token.balanceOf(recipient), STREAM_AMOUNT);
+        vm.stopPrank();
     }
 
     function test_cancel_sendsFairSharePerElapsedTimeNoWithdrawals(uint256 elapsedTime) public {
@@ -335,14 +339,19 @@ contract StreamCancelTest is StreamTest {
         vm.prank(payer);
         s.cancel();
 
-        assertEq(s.recipientBalance(), expectedRecipientBalance);
+        assertEq(s.recipientBalance(), 0);
+        assertEq(s.recipientCancelBalance(), expectedRecipientBalance);
 
         vm.prank(payer);
         s.recoverTokens(address(token), expectedPayerBalance);
 
         if (expectedRecipientBalance > 0) {
-            vm.prank(recipient);
+            vm.startPrank(recipient);
+            vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
             s.withdraw(expectedRecipientBalance);
+
+            s.withdrawAfterCancel(expectedRecipientBalance);
+            vm.stopPrank();
         }
 
         assertEq(token.balanceOf(payer), expectedPayerBalance);
@@ -389,8 +398,12 @@ contract StreamCancelTest is StreamTest {
         s.recoverTokens(address(token), expectedPayerBalance);
 
         if (expectedRecipientBalance > 0) {
-            vm.prank(recipient);
+            vm.startPrank(recipient);
+            vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
             s.withdraw(expectedRecipientBalance);
+
+            s.withdrawAfterCancel(expectedRecipientBalance);
+            vm.stopPrank();
         }
 
         assertEq(token.balanceOf(payer), expectedPayerBalance);
@@ -473,13 +486,18 @@ contract StreamCancelTest is StreamTest {
         vm.prank(payer);
         s.cancel();
 
-        assertEq(s.recipientBalance(), expectedRecipientBalance);
+        assertEq(s.recipientBalance(), 0);
+        assertEq(s.recipientCancelBalance(), expectedRecipientBalance);
 
         vm.prank(payer);
         s.recoverTokens(address(token), expectedPayerBalance);
 
-        vm.prank(recipient);
+        vm.startPrank(recipient);
+        vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
         s.withdraw(expectedRecipientBalance);
+
+        s.withdrawAfterCancel(expectedRecipientBalance);
+        vm.stopPrank();
 
         assertEq(token.balanceOf(payer), expectedPayerBalance);
         assertEq(token.balanceOf(recipient), expectedRecipientBalanceBeforeWithdrawal);
