@@ -240,7 +240,7 @@ contract Stream is IStream, Clone {
     /**
      * @notice Cancel the stream and update recipient's fair share of the funds to their current balance.
      * Each party must take additional action to withdraw their funds:
-     * recipient must call `withdraw`.
+     * recipient must call `withdrawAfterCancel`.
      * payer must call `recoverTokens`.
      * Only this stream's payer or recipient can call this function.
      */
