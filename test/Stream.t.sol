@@ -8,6 +8,7 @@ import { StreamFactory } from "../src/StreamFactory.sol";
 import { Stream } from "../src/Stream.sol";
 import { IStream } from "../src/IStream.sol";
 import { ReentranceToken, ReentranceRecipient } from "./helpers/Reentrance.sol";
+import { ETHRejector } from "./helpers/ETHRejector.sol";
 
 contract StreamTest is Test {
     uint256 constant DURATION = 1000;
@@ -881,5 +882,52 @@ contract StreamRecoverTokensTest is StreamTest {
         );
         vm.prank(payer);
         s.recoverTokens(address(token), STREAM_AMOUNT - 2);
+    }
+}
+
+contract StreamRescueETHTest is StreamTest {
+    function setUp() public override {
+        super.setUp();
+
+        s = Stream(
+            factory.createStream(
+                payer, recipient, STREAM_AMOUNT, address(token), startTime, stopTime
+            )
+        );
+    }
+
+    function test_rescueETH_revertsWhenCallerIsntPayer() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.CallerNotPayer.selector));
+        s.rescueETH(address(0x42), 0);
+    }
+
+    function test_rescueETH_revertsWhenBalanceIsBelowRequestedAmount() public {
+        vm.expectRevert(abi.encodeWithSelector(Stream.ETHRescueFailed.selector));
+        vm.prank(payer);
+        s.rescueETH(address(0x42), 1);
+
+        vm.deal(address(s), 42 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(Stream.ETHRescueFailed.selector));
+        vm.prank(payer);
+        s.rescueETH(address(0x42), 42.1 ether);
+    }
+
+    function test_rescueETH_revertsWhenSendingToRejectingContract() public {
+        ETHRejector rejector = new ETHRejector();
+        vm.deal(address(s), 1 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(Stream.ETHRescueFailed.selector));
+        vm.prank(payer);
+        s.rescueETH(address(rejector), 1 ether);
+    }
+
+    function test_rescueETH_worksAndEmits() public {
+        vm.deal(address(s), 1 ether);
+
+        vm.prank(payer);
+        s.rescueETH(address(0x42), 1 ether);
+
+        assertEq(address(0x42).balance, 1 ether);
     }
 }
