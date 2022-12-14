@@ -37,7 +37,6 @@ export function createStreamCancelledEvent(
   timestamp: BigInt,
   msgSender: Address,
   stream: Address,
-  payerBalance: BigInt,
   recipientBalance: BigInt,
 ): StreamCancelled {
   let newEvent = changetype<StreamCancelled>(newMockEvent());
@@ -61,7 +60,6 @@ export function createStreamCancelledEvent(
       ethereum.Value.fromAddress(Address.fromString("0x0000000000000000000000000000000000000000")),
     ),
   );
-  newEvent.parameters.push(new ethereum.EventParam("payerBalance", ethereum.Value.fromUnsignedBigInt(payerBalance)));
   newEvent.parameters.push(
     new ethereum.EventParam("recipientBalance", ethereum.Value.fromUnsignedBigInt(recipientBalance)),
   );

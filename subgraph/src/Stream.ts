@@ -19,7 +19,6 @@ export function handleStreamCancelled(event: StreamCancelled): void {
   cancellation.cancelledAt = event.block.timestamp;
   cancellation.cancelledBy = event.params.msgSender;
   cancellation.stream = event.address;
-  cancellation.payerBalance = event.params.payerBalance;
   cancellation.recipientBalance = event.params.recipientBalance;
 
   cancellation.save();

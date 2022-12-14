@@ -42,6 +42,6 @@ templates:
         - event: TokensWithdrawn(indexed address,indexed address,uint256)
           handler: handleTokensWithdrawn
         - event: StreamCancelled(indexed address,indexed address,indexed
-            address,uint256,uint256)
+            address,uint256)
           handler: handleStreamCancelled
     network: goerli

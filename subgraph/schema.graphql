@@ -63,9 +63,6 @@ type Cancellation @entity(immutable: true) {
   "The cancelled stream"
   stream: Stream!
 
-  "The balance sent to payer upon this cancellation."
-  payerBalance: BigInt!
-
   "The balance sent to recipient upon this cancellation."
   recipientBalance: BigInt!
 }

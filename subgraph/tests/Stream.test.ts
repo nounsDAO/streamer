@@ -62,11 +62,10 @@ describe("Stream", () => {
     const logIndex = BigInt.fromI32(0);
     const timestamp = BigInt.fromI32(1000);
     const msgSender = Address.fromString("0x0000000000000000000000000000000000000001");
-    const payerBalance = BigInt.fromI32(1234);
     const recipientBalance = BigInt.fromI32(4321);
 
     handleStreamCancelled(
-      createStreamCancelledEvent(txHash, logIndex, timestamp, msgSender, streamAddress, payerBalance, recipientBalance),
+      createStreamCancelledEvent(txHash, logIndex, timestamp, msgSender, streamAddress, recipientBalance),
     );
 
     const c = Cancellation.load(txHash.toHex() + "-" + logIndex.toString());
@@ -74,7 +73,6 @@ describe("Stream", () => {
     assert.bigIntEquals(c!.cancelledAt, timestamp);
     assert.stringEquals(c!.cancelledBy.toHex(), msgSender.toHex());
     assert.stringEquals(c!.stream.toHex(), streamAddress.toHex());
-    assert.bigIntEquals(c!.payerBalance, payerBalance);
     assert.bigIntEquals(c!.recipientBalance, recipientBalance);
   });
 });
