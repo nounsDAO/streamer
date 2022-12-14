@@ -682,15 +682,11 @@ contract StreamWithRemainderTest is StreamTest {
                 payer, recipient, streamAmount, address(token), startTime, stopTime
             )
         );
-
-        // streamAmount / duration = 6666666.66666667
-        // assuming RATE_DECIMALS_MULTIPLIER = 6, we get 6666666666666
-        assertEq(s.ratePerSecond(), 6666666666666);
     }
 
-    function test_balanceOf_usesRateDecimalsMidStream() public {
+    function test_balanceOf_worksMidStream() public {
         vm.warp(startTime + 150);
-        assertEq(s.recipientBalance(), 999999999);
+        assertEq(s.recipientBalance(), 1000000000);
 
         vm.warp(startTime + 200);
         assertEq(s.recipientBalance(), 1333333333);
@@ -703,16 +699,16 @@ contract StreamWithRemainderTest is StreamTest {
 
         vm.warp(startTime + 150);
         vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
-        s.withdraw(1000000000);
+        s.withdraw(1000000001);
 
-        s.withdraw(999999999);
-        assertEq(token.balanceOf(recipient), 999999999);
+        s.withdraw(1000000000);
+        assertEq(token.balanceOf(recipient), 1000000000);
 
         vm.warp(startTime + 200);
         vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
-        s.withdraw(333333335);
-
         s.withdraw(333333334);
+
+        s.withdraw(333333333);
         assertEq(token.balanceOf(recipient), 1333333333);
 
         vm.stopPrank();
@@ -749,15 +745,11 @@ contract StreamWithRemainderHighDurationAndAmountTest is StreamTest {
                 payer, recipient, streamAmount, address(token), startTime, stopTime
             )
         );
-
-        // streamAmount / duration = 63371.35614702
-        // assuming RATE_DECIMALS_MULTIPLIER = 1e6, we get 63371356147
-        assertEq(s.ratePerSecond(), 63371356147);
     }
 
-    function test_balanceOf_usesRateDecimalsMidStream() public {
+    function test_balanceOf_worksMidStream() public {
         vm.warp(startTime + 7890000); // half way in
-        assertEq(s.recipientBalance(), 499999999999);
+        assertEq(s.recipientBalance(), 500000000000);
 
         vm.warp(startTime + 10520000); // two thirds in
         assertEq(s.recipientBalance(), 666666666666);
@@ -770,16 +762,16 @@ contract StreamWithRemainderHighDurationAndAmountTest is StreamTest {
 
         vm.warp(startTime + 7890000);
         vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
-        s.withdraw(500_000 * 1e6);
+        s.withdraw(500_001 * 1e6);
 
-        s.withdraw(499999999999);
-        assertEq(token.balanceOf(recipient), 499999999999);
+        s.withdraw(500_000 * 1e6);
+        assertEq(token.balanceOf(recipient), 500_000 * 1e6);
 
         vm.warp(startTime + 10520000);
         vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
-        s.withdraw(166666666668);
-
         s.withdraw(166666666667);
+
+        s.withdraw(166666666666);
         assertEq(token.balanceOf(recipient), 666666666666);
 
         vm.stopPrank();
