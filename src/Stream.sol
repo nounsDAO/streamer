@@ -52,7 +52,7 @@ contract Stream is IStream, Clone {
         uint256 recipientBalance
     );
 
-    event TokensRecovered(address tokenAddress, uint256 amount);
+    event TokensRecovered(address indexed payer, address tokenAddress, uint256 amount);
 
     event ETHRescued(address indexed payer, address indexed to, uint256 amount);
 
@@ -282,7 +282,7 @@ contract Stream is IStream, Clone {
 
         if (tokenBalance() < requiredBalanceAfter) revert RescueTokenAmountExceedsExcessBalance();
 
-        emit TokensRecovered(tokenAddress, amount);
+        emit TokensRecovered(msg.sender, tokenAddress, amount);
     }
 
     /**
