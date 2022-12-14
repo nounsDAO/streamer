@@ -99,6 +99,12 @@
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
+        "name": "payer",
+        "type": "address"
+      },
+      {
         "indexed": false,
         "internalType": "address",
         "name": "tokenAddress",
