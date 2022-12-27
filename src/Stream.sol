@@ -52,8 +52,10 @@ contract Stream is IStream, Clone {
         uint256 recipientBalance
     );
 
+    /// @notice Emitted when payer recovers excess stream payment tokens, or other ERC20 tokens accidentally sent to this stream
     event TokensRecovered(address tokenAddress, uint256 amount);
 
+    /// @notice Emitted when recovering ETH accidentally sent to this stream
     event ETHRescued(address indexed payer, address indexed to, uint256 amount);
 
     /**
