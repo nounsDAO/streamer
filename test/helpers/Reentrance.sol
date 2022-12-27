@@ -14,6 +14,9 @@ contract ReentranceRecipient {
             attemptedReentry = true;
             if (reenterCancel) {
                 stream.cancel();
+                if (stream.recipientCancelBalance() > 0) {
+                    stream.withdraw(stream.recipientCancelBalance());
+                }
             } else {
                 stream.withdraw(amount);
             }

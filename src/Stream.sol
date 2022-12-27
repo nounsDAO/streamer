@@ -6,6 +6,7 @@ import { IStream } from "./IStream.sol";
 import { Clone } from "solady/utils/Clone.sol";
 import { IERC20 } from "openzeppelin-contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 
 /**
  * @title Stream
@@ -30,7 +31,9 @@ contract Stream is IStream, Clone {
     error AmountExceedsBalance();
     error CallerNotPayerOrRecipient();
     error CallerNotPayer();
-    error CannotRescueStreamToken();
+    error RescueTokenAmountExceedsExcessBalance();
+    error StreamNotActive();
+    error ETHRescueFailed();
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -46,21 +49,20 @@ contract Stream is IStream, Clone {
         address indexed msgSender,
         address indexed payer,
         address indexed recipient,
-        uint256 payerBalance,
         uint256 recipientBalance
     );
+
+    /// @notice Emitted when payer recovers excess stream payment tokens, or other ERC20 tokens accidentally sent to this stream
+    event TokensRecovered(address indexed payer, address tokenAddress, uint256 amount);
+
+    /// @notice Emitted when recovering ETH accidentally sent to this stream
+    event ETHRescued(address indexed payer, address indexed to, uint256 amount);
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      *   IMMUTABLES
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
-
-    /**
-     * @notice Used to add precision to `ratePerSecond`, to minimize the impact of rounding down.
-     * See `ratePerSecond()` implementation for more information.
-     */
-    uint256 public constant RATE_DECIMALS_MULTIPLIER = 1e6;
 
     /**
      * @notice Get the address of the factory contract that cloned this Stream instance.
@@ -119,25 +121,6 @@ contract Stream is IStream, Clone {
     }
 
     /**
-     * @notice Get this stream's token streaming rate per second.
-     * @dev Uses clone-with-immutable-args to read the value from the contract's code region rather than state to save gas.
-     */
-    function ratePerSecond() public pure returns (uint256) {
-        uint256 duration = stopTime() - startTime();
-
-        unchecked {
-            // ratePerSecond can lose precision as its being rounded down here
-            // the value lost in rounding down results in less income per second for recipient
-            // max round down impact is duration - 1; e.g. one year, that's 31_557_599
-            // e.g. using USDC (w/ 6 decimals) that's ~32 USDC
-            // since ratePerSecond has 6 decimals, 31_557_599 / 1e6 = 0.00003156; round down impact becomes negligible
-            // finally, this remainder dust becomes available to recipient when stream duration is fully elapsed
-            // see `_recipientBalance` where `blockTime >= stopTime`
-            return RATE_DECIMALS_MULTIPLIER * tokenAmount() / duration;
-        }
-    }
-
-    /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      *   STORAGE VARIABLES
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -151,6 +134,13 @@ contract Stream is IStream, Clone {
      * If this were the sum of withdrawals, recipient would pay 20K extra gas on their first withdrawal.
      */
     uint256 public remainingBalance;
+
+    /**
+     * @notice The recipient's balance once the stream is cancelled. It is set to the recipient's balance
+     * at the moment of cancellation, and is decremented when recipient withdraws post-cancellation.
+     * @dev It's assumed to be zero as long as the stream has not been cancelled.
+     */
+    uint256 public recipientCancelBalance;
 
     /**
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -214,7 +204,7 @@ contract Stream is IStream, Clone {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
 
-        uint256 balance = balanceOf(recipient_);
+        uint256 balance = recipientBalance();
         if (balance < amount) revert AmountExceedsBalance();
 
         // This is safe because it should always be the case that:
@@ -228,47 +218,90 @@ contract Stream is IStream, Clone {
     }
 
     /**
-     * @notice Cancel the stream and send payer and recipient their fair share of the funds.
-     * If the stream is sufficiently funded to pay recipient, execution will always succeed.
-     * Payer receives the stream's token balance after paying recipient, which is fair if payer
-     * hadn't fully funded the stream.
+     * @notice Cancel the stream and update recipient's fair share of the funds to their current balance.
+     * Each party must take additional action to withdraw their funds:
+     * recipient must call `withdrawAfterCancel`.
+     * payer must call `recoverTokens`.
      * Only this stream's payer or recipient can call this function.
+     * Reverts if executed after recipient has withdrawn the full stream amount, or if executed more than once.
      */
     function cancel() external onlyPayerOrRecipient {
         address payer_ = payer();
         address recipient_ = recipient();
-        IERC20 token_ = token();
 
-        uint256 recipientBalance = balanceOf(recipient_);
+        if (remainingBalance == 0) revert StreamNotActive();
+
+        uint256 recipientBalance_ = recipientBalance();
+
+        // This token amount is available to recipient to withdraw via `withdrawAfterCancel`.
+        recipientCancelBalance = recipientBalance_;
 
         // This zeroing is important because without it, it's possible for recipient to obtain additional funds
         // from this contract if anyone (e.g. payer) sends it tokens after cancellation.
         // Thanks to this state update, `balanceOf(recipient_)` will only return zero in future calls.
         remainingBalance = 0;
 
-        if (recipientBalance > 0) token_.safeTransfer(recipient_, recipientBalance);
-
-        // Using the stream's token balance rather than any other calculated field because it gracefully
-        // supports cancelling the stream even if payer hasn't fully funded it.
-        uint256 payerBalance = tokenBalance();
-        if (payerBalance > 0) {
-            token_.safeTransfer(payer_, payerBalance);
-        }
-
-        emit StreamCancelled(msg.sender, payer_, recipient_, payerBalance, recipientBalance);
+        emit StreamCancelled(msg.sender, payer_, recipient_, recipientBalance_);
     }
 
     /**
-     * @notice Recover ERC20 tokens accidentally sent to this stream.
-     * Reverts when trying to recover this stream's payment token.
+     * @notice Withdraw tokens to recipient's account after the stream has been cancelled.
+     * Execution fails if the requested amount is greater than recipient's withdrawable balance.
+     * Only this stream's payer or recipient can call this function.
+     * @param amount the amount of tokens to withdraw.
+     */
+    function withdrawAfterCancel(uint256 amount) external onlyPayerOrRecipient {
+        if (amount == 0) revert CantWithdrawZero();
+        address recipient_ = recipient();
+
+        // Reverts if amount > recipientCancelBalance
+        recipientCancelBalance -= amount;
+        token().safeTransfer(recipient_, amount);
+
+        emit TokensWithdrawn(msg.sender, recipient_, amount);
+    }
+
+    /**
+     * @notice Recover excess stream payment tokens, or other ERC20 tokens accidentally sent to this stream.
+     * When a stream is cancelled payer uses this function to recover their fair share of tokens.
+     * Reverts when trying to recover stream's payment token at an amount that exceeds
+     * the excess token balance; any rescue should always leave sufficient tokens to
+     * fully pay recipient.
      * Reverts when msg.sender is not this stream's payer.
+     * @dev Checking token balance before and after to defend against the case of multiple contracts
+     * updating the balance of the same token.
      * @param tokenAddress the contract address of the token to recover.
      * @param amount the amount to recover.
      */
-    function rescueERC20(address tokenAddress, uint256 amount) external onlyPayer {
-        if (tokenAddress == address(token())) revert CannotRescueStreamToken();
+    function recoverTokens(address tokenAddress, uint256 amount) external onlyPayer {
+        // When the stream is under-funded, it should keep its current balance
+        // When it's sufficiently-funded, it should keep the full balance committed to recipient
+        // i.e. `remainingBalance` or `recipientCancelBalance`
+        uint256 requiredBalanceAfter =
+            Math.min(tokenBalance(), Math.max(remainingBalance, recipientCancelBalance));
 
         IERC20(tokenAddress).safeTransfer(msg.sender, amount);
+
+        if (tokenBalance() < requiredBalanceAfter) revert RescueTokenAmountExceedsExcessBalance();
+
+        emit TokensRecovered(msg.sender, tokenAddress, amount);
+    }
+
+    /**
+     * @notice Recover ETH accidentally sent to this stream.
+     * Reverts if ETH sending failed.
+     * @dev This is necessary because `LibClone` creates minimal clones with a default receive function, rather than
+     * forwarding to clones, to support gas-restrictive transfers that might fail with the extra gas cost of DELEGATECALL.
+     * So rather than block ETH transfers, we're allowing payer to recover ETH.
+     * @param to the address to send ETH to, useful when payer might be a contract that can't receive ETH.
+     * @param amount the amount of ETH to recover.
+     */
+    function rescueETH(address to, uint256 amount) external onlyPayer {
+        (bool sent,) = to.call{value: amount}("");
+
+        if (!sent) revert ETHRescueFailed();
+
+        emit ETHRescued(msg.sender, to, amount);
     }
 
     /**
@@ -276,25 +309,6 @@ contract Stream is IStream, Clone {
      *   VIEW FUNCTIONS
      * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
      */
-
-    /**
-     * @notice Returns the available funds to withdraw.
-     * @param who The address for which to query the balance.
-     * @return uint256 The total funds allocated to `who` as uint256.
-     */
-    function balanceOf(address who) public view returns (uint256) {
-        uint256 recipientBalance = _recipientBalance();
-
-        if (who == recipient()) return recipientBalance;
-        if (who == payer()) {
-            // This is safe because it should always be the case that:
-            // remainingBalance >= recipientBalance.
-            unchecked {
-                return remainingBalance - recipientBalance;
-            }
-        }
-        return 0;
-    }
 
     /**
      * @notice Returns the time elapsed in this stream, or zero if it hasn't started yet.
@@ -318,29 +332,28 @@ contract Stream is IStream, Clone {
     }
 
     /**
-     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-     *   INTERNAL FUNCTIONS
-     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     * @notice Get this stream's recipient's balance, taking into account vesting over time and withdrawals.
+     * When a stream is cancelled this function always returns zero, to make sure that `withdraw` no longer sends any funds.
+     * To learn the recipient's balance post-cancel use `recipientCancelBalance`.
      */
-
-    /**
-     * @dev Helper function for `balanceOf` in calculating recipient's fair share of tokens, taking withdrawals into account.
-     */
-    function _recipientBalance() internal view returns (uint256) {
+    function recipientBalance() public view returns (uint256) {
         uint256 startTime_ = startTime();
+        uint256 stopTime_ = stopTime();
         uint256 blockTime = block.timestamp;
 
         if (blockTime <= startTime_) return 0;
 
         uint256 tokenAmount_ = tokenAmount();
         uint256 balance;
-        if (blockTime >= stopTime()) {
+        if (blockTime >= stopTime_) {
             balance = tokenAmount_;
         } else {
             // This is safe because: blockTime > startTime_ (checked above).
+            // and stopTime_ > startTime_ (checked in StreamFactory).
             unchecked {
                 uint256 elapsedTime_ = blockTime - startTime_;
-                balance = (elapsedTime_ * ratePerSecond()) / RATE_DECIMALS_MULTIPLIER;
+                uint256 duration = stopTime_ - startTime_;
+                balance = elapsedTime_ * tokenAmount_ / duration;
             }
         }
 
@@ -366,6 +379,12 @@ contract Stream is IStream, Clone {
 
         return balance;
     }
+
+    /**
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     *   INTERNAL FUNCTIONS
+     * ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     */
 
     /**
      * @dev Helper function that makes the rest of the code look nicer.

@@ -42,6 +42,10 @@ templates:
         - event: TokensWithdrawn(indexed address,indexed address,uint256)
           handler: handleTokensWithdrawn
         - event: StreamCancelled(indexed address,indexed address,indexed
-            address,uint256,uint256)
+            address,uint256)
           handler: handleStreamCancelled
+        - event: TokensRecovered(indexed address,address,uint256)
+          handler: handleTokensRecovered
+        - event: ETHRescued(indexed address,indexed address,uint256)
+          handler: handleETHRescued
     network: goerli

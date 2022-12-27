@@ -60,12 +60,43 @@ type Cancellation @entity(immutable: true) {
   "The msg.sender that created this cancellation."
   cancelledBy: Bytes!
 
-  "The cancelled stream"
+  "The cancelled stream."
   stream: Stream!
-
-  "The balance sent to payer upon this cancellation."
-  payerBalance: BigInt!
 
   "The balance sent to recipient upon this cancellation."
   recipientBalance: BigInt!
+}
+
+type TokenRecovery @entity(immutable: true) {
+  "A concatination of the recovery tx hash and the the event log index."
+  id: String!
+
+  "The unix timestamp when this withdrawal was performed."
+  recoveredAt: BigInt!
+
+  "The stream recovered from."
+  stream: Stream!
+
+  "The contract address of the recovered token."
+  tokenAddress: Bytes!
+
+  "The token amount."
+  amount: BigInt!
+}
+
+type ETHRescue @entity(immutable: true) {
+  "A concatination of the recovery tx hash and the the event log index."
+  id: String!
+
+  "The unix timestamp when this withdrawal was performed."
+  rescuedAt: BigInt!
+
+  "The stream recovered from."
+  stream: Stream!
+
+  "The account to which the rescued ETH was sent."
+  to: Bytes!
+
+  "The ETH amount."
+  amount: BigInt!
 }
