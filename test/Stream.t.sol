@@ -28,7 +28,7 @@ contract StreamTest is Test {
         uint256 recipientBalance
     );
 
-    event TokensRecovered(address tokenAddress, uint256 amount);
+    event TokensRecovered(address indexed payer, address tokenAddress, uint256 amount);
 
     ERC20Mock token;
     Stream s;
@@ -838,7 +838,7 @@ contract StreamRecoverTokensTest is StreamTest {
         assertEq(otherToken.balanceOf(payer), 0);
 
         vm.expectEmit(true, true, true, true);
-        emit TokensRecovered(address(otherToken), 1234);
+        emit TokensRecovered(payer, address(otherToken), 1234);
 
         vm.prank(payer);
         s.recoverTokens(address(otherToken), 1234);
@@ -850,7 +850,7 @@ contract StreamRecoverTokensTest is StreamTest {
         token.mint(address(s), STREAM_AMOUNT + 1234);
 
         vm.expectEmit(true, true, true, true);
-        emit TokensRecovered(address(token), 1234);
+        emit TokensRecovered(payer, address(token), 1234);
 
         vm.prank(payer);
         s.recoverTokens(address(token), 1234);
@@ -866,7 +866,7 @@ contract StreamRecoverTokensTest is StreamTest {
         s.withdraw(STREAM_AMOUNT / 2);
 
         vm.expectEmit(true, true, true, true);
-        emit TokensRecovered(address(token), 1234);
+        emit TokensRecovered(payer, address(token), 1234);
 
         vm.prank(payer);
         s.recoverTokens(address(token), 1234);
