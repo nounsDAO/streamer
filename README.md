@@ -187,6 +187,13 @@ Querying works as outlined above for local testing.
 
 ## Latest deployment
 
+### Mainnet
+
+| Contract      | Address                                                                                                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| StreamFactory | [0x5CCA4E05Eb2E5f5c40945C24d3d3ea48C15a4Ad0](https://etherscan.io/address/0x5CCA4E05Eb2E5f5c40945C24d3d3ea48C15a4Ad0) |
+| Stream        | [0xe6c0415dA31A2f270411945535528404a4515016](https://etherscan.io/address/0xe6c0415dA31A2f270411945535528404a4515016) |
+
 ### Goerli
 
 | Contract      | Address                                                                                                                      |
