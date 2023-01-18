@@ -273,7 +273,7 @@ contract Stream is IStream, Clone {
      * @param tokenAddress the contract address of the token to recover.
      * @param amount the amount to recover.
      */
-    function recoverTokens(address tokenAddress, uint256 amount) external onlyPayer {
+    function recoverTokens(address tokenAddress, uint256 amount) public onlyPayer {
         // When the stream is under-funded, it should keep its current balance
         // When it's sufficiently-funded, it should keep the full balance committed to recipient
         // i.e. `remainingBalance` or `recipientCancelBalance`
@@ -285,6 +285,21 @@ contract Stream is IStream, Clone {
         if (tokenBalance() < requiredBalanceAfter) revert RescueTokenAmountExceedsExcessBalance();
 
         emit TokensRecovered(msg.sender, tokenAddress, amount);
+    }
+
+    /**
+     * @notice Recover maximumal amount of payment by `payer`
+     * This can be used after canceling a stream to withdraw all the unvested tokens
+     * @dev Reverts when msg.sender is not this stream's payer
+     * @return tokensToWithdraw the amount of tokens withdrawn
+     */
+    function recoverTokens() external returns (uint256 tokensToWithdraw) {
+        uint256 requiredBalanceAfter =
+            Math.min(tokenBalance(), Math.max(remainingBalance, recipientCancelBalance));
+
+        tokensToWithdraw = tokenBalance() - requiredBalanceAfter;
+
+        recoverTokens(address(token()), tokensToWithdraw);
     }
 
     /**

@@ -9,6 +9,7 @@ import { Stream } from "../src/Stream.sol";
 import { IStream } from "../src/IStream.sol";
 import { ReentranceToken, ReentranceRecipient } from "./helpers/Reentrance.sol";
 import { ETHRejector } from "./helpers/ETHRejector.sol";
+import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
 
 contract StreamTest is Test {
     uint256 constant DURATION = 1000;
@@ -365,6 +366,35 @@ contract StreamCancelTest is StreamTest {
 
         assertEq(token.balanceOf(payer), expectedPayerBalance);
         assertEq(token.balanceOf(recipient), expectedRecipientBalance);
+    }
+
+    function test_recoverTokens_afterCancel(uint256 elapsedTime, uint256 amountFunded)
+        public
+    {
+        // No need for elapsedTime = 0 because it's tested above
+        elapsedTime = bound(elapsedTime, 1, DURATION);
+
+        amountFunded = bound(amountFunded, 0, STREAM_AMOUNT);
+
+        token.mint(address(s), amountFunded);
+        assertEq(token.balanceOf(payer), 0);
+        assertEq(token.balanceOf(recipient), 0);
+        vm.warp(startTime + elapsedTime);
+        uint256 expectedRecipientBalance = Math.min(amountFunded, (STREAM_AMOUNT * elapsedTime) / DURATION);
+        uint256 expectedPayerBalance = amountFunded - expectedRecipientBalance;
+
+        vm.startPrank(payer);
+        s.cancel();
+        uint256 tokensWithdrawn = s.recoverTokens();
+
+        assertEq(tokensWithdrawn, expectedPayerBalance);
+        assertEq(token.balanceOf(payer), expectedPayerBalance);
+    }
+
+    function test_recoverTokens_revertsIfNotPayer() public {
+        vm.prank(address(0x999));
+        vm.expectRevert(abi.encodeWithSelector(Stream.CallerNotPayer.selector));
+        s.recoverTokens();
     }
 
     function test_cancel_allocatesFairSharePerElapsedTimeAndWithdrawals(
