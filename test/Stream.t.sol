@@ -19,6 +19,7 @@ contract StreamTest is Test {
     uint256 stopTime;
     address payer = address(0x11);
     address recipient = address(0x22);
+    address otherAddress = address(0x33);
 
     event TokensWithdrawn(address indexed msgSender, address indexed recipient, uint256 amount);
 
@@ -29,7 +30,7 @@ contract StreamTest is Test {
         uint256 recipientBalance
     );
 
-    event TokensRecovered(address indexed payer, address tokenAddress, uint256 amount);
+    event TokensRecovered(address indexed payer, address tokenAddress, uint256 amount, address to);
 
     ERC20Mock token;
     Stream s;
@@ -291,13 +292,23 @@ contract StreamCancelTest is StreamTest {
         s.cancel();
 
         vm.prank(payer);
-        s.recoverTokens(address(token), STREAM_AMOUNT);
+        s.recoverTokens(address(token), STREAM_AMOUNT, payer);
         assertEq(token.balanceOf(payer), STREAM_AMOUNT);
 
         vm.expectRevert(abi.encodeWithSelector(Stream.AmountExceedsBalance.selector));
         vm.prank(recipient);
         s.withdraw(1);
         assertEq(token.balanceOf(recipient), 0);
+    }
+
+    function test_cancel_payerCanRecoverEverythingBeforeStartTime_andSendToDifferentAddress() public {
+        token.mint(address(s), STREAM_AMOUNT);
+
+        vm.startPrank(payer);
+        s.cancel();
+        s.recoverTokens(otherAddress);
+
+        assertEq(token.balanceOf(otherAddress), STREAM_AMOUNT);
     }
 
     function test_cancel_allocatesEverythingToRecipientAfterStopTimeAndNoWithdrawals() public {
@@ -315,7 +326,7 @@ contract StreamCancelTest is StreamTest {
             abi.encodeWithSelector(Stream.RescueTokenAmountExceedsExcessBalance.selector)
         );
         vm.prank(payer);
-        s.recoverTokens(address(token), 1);
+        s.recoverTokens(address(token), 1, payer);
         assertEq(token.balanceOf(payer), 0);
 
         vm.startPrank(recipient);
@@ -351,9 +362,9 @@ contract StreamCancelTest is StreamTest {
         vm.expectRevert(
             abi.encodeWithSelector(Stream.RescueTokenAmountExceedsExcessBalance.selector)
         );
-        s.recoverTokens(address(token), expectedPayerBalance + 1);
+        s.recoverTokens(address(token), expectedPayerBalance + 1, payer);
 
-        s.recoverTokens(address(token), expectedPayerBalance);
+        s.recoverTokens(address(token), expectedPayerBalance, payer);
 
         if (expectedRecipientBalance > 0) {
             changePrank(recipient);
@@ -385,7 +396,7 @@ contract StreamCancelTest is StreamTest {
 
         vm.startPrank(payer);
         s.cancel();
-        uint256 tokensWithdrawn = s.recoverTokens();
+        uint256 tokensWithdrawn = s.recoverTokens(payer);
 
         assertEq(tokensWithdrawn, expectedPayerBalance);
         assertEq(token.balanceOf(payer), expectedPayerBalance);
@@ -394,7 +405,7 @@ contract StreamCancelTest is StreamTest {
     function test_recoverTokens_revertsIfNotPayer() public {
         vm.prank(address(0x999));
         vm.expectRevert(abi.encodeWithSelector(Stream.CallerNotPayer.selector));
-        s.recoverTokens();
+        s.recoverTokens(payer);
     }
 
     function test_cancel_allocatesFairSharePerElapsedTimeAndWithdrawals(
@@ -440,7 +451,7 @@ contract StreamCancelTest is StreamTest {
         s.cancel();
 
         vm.prank(payer);
-        s.recoverTokens(address(token), expectedPayerBalance);
+        s.recoverTokens(address(token), expectedPayerBalance, payer);
 
         if (expectedRecipientBalance > 0) {
             vm.startPrank(recipient);
@@ -470,9 +481,9 @@ contract StreamCancelTest is StreamTest {
 
         vm.startPrank(payer);
         vm.expectRevert("ERC20: transfer amount exceeds balance");
-        s.recoverTokens(address(token), fundedAmount + 1);
+        s.recoverTokens(address(token), fundedAmount + 1, payer);
 
-        s.recoverTokens(address(token), fundedAmount);
+        s.recoverTokens(address(token), fundedAmount, payer);
         assertEq(token.balanceOf(payer), fundedAmount);
 
         vm.stopPrank();
@@ -492,7 +503,7 @@ contract StreamCancelTest is StreamTest {
         assertEq(s.recipientBalance(), 0);
 
         vm.prank(payer);
-        s.recoverTokens(address(token), fundedAmount);
+        s.recoverTokens(address(token), fundedAmount, payer);
         assertEq(token.balanceOf(payer), fundedAmount);
     }
 
@@ -547,9 +558,9 @@ contract StreamCancelTest is StreamTest {
         } else {
             vm.expectRevert("ERC20: transfer amount exceeds balance");
         }
-        s.recoverTokens(address(token), expectedPayerBalance + 1);
+        s.recoverTokens(address(token), expectedPayerBalance + 1, payer);
 
-        s.recoverTokens(address(token), expectedPayerBalance);
+        s.recoverTokens(address(token), expectedPayerBalance, payer);
 
         changePrank(recipient);
         if (expectedRecipientBalance > 0) {
@@ -842,13 +853,13 @@ contract StreamRecoverTokensTest is StreamTest {
 
     function test_recoverTokens_revertsWhenCallerIsntPayer() public {
         vm.expectRevert(abi.encodeWithSelector(Stream.CallerNotPayer.selector));
-        s.recoverTokens(address(otherToken), 0);
+        s.recoverTokens(address(otherToken), 0, payer);
     }
 
     function test_recoverTokens_revertsWhenAmountIsGreaterThanBalance() public {
         vm.expectRevert("ERC20: transfer amount exceeds balance");
         vm.prank(payer);
-        s.recoverTokens(address(otherToken), 1);
+        s.recoverTokens(address(otherToken), 1, payer);
     }
 
     function test_recoverTokens_streamToken_revertsWhenTryingToRecoverTooManyStreamTokens()
@@ -860,7 +871,7 @@ contract StreamRecoverTokensTest is StreamTest {
             abi.encodeWithSelector(Stream.RescueTokenAmountExceedsExcessBalance.selector)
         );
         vm.prank(payer);
-        s.recoverTokens(address(token), 1);
+        s.recoverTokens(address(token), 1, payer);
     }
 
     function test_recoverTokens_otherToken_worksWhenAmountDoesntExceedBalance() public {
@@ -868,10 +879,10 @@ contract StreamRecoverTokensTest is StreamTest {
         assertEq(otherToken.balanceOf(payer), 0);
 
         vm.expectEmit(true, true, true, true);
-        emit TokensRecovered(payer, address(otherToken), 1234);
+        emit TokensRecovered(payer, address(otherToken), 1234, payer);
 
         vm.prank(payer);
-        s.recoverTokens(address(otherToken), 1234);
+        s.recoverTokens(address(otherToken), 1234, payer);
 
         assertEq(otherToken.balanceOf(payer), 1234);
     }
@@ -880,10 +891,10 @@ contract StreamRecoverTokensTest is StreamTest {
         token.mint(address(s), STREAM_AMOUNT + 1234);
 
         vm.expectEmit(true, true, true, true);
-        emit TokensRecovered(payer, address(token), 1234);
+        emit TokensRecovered(payer, address(token), 1234, payer);
 
         vm.prank(payer);
-        s.recoverTokens(address(token), 1234);
+        s.recoverTokens(address(token), 1234, payer);
 
         assertEq(token.balanceOf(payer), 1234);
     }
@@ -896,10 +907,10 @@ contract StreamRecoverTokensTest is StreamTest {
         s.withdraw(STREAM_AMOUNT / 2);
 
         vm.expectEmit(true, true, true, true);
-        emit TokensRecovered(payer, address(token), 1234);
+        emit TokensRecovered(payer, address(token), 1234, payer);
 
         vm.prank(payer);
-        s.recoverTokens(address(token), 1234);
+        s.recoverTokens(address(token), 1234, payer);
 
         assertEq(token.balanceOf(payer), 1234);
     }
@@ -911,7 +922,7 @@ contract StreamRecoverTokensTest is StreamTest {
             abi.encodeWithSelector(Stream.RescueTokenAmountExceedsExcessBalance.selector)
         );
         vm.prank(payer);
-        s.recoverTokens(address(token), STREAM_AMOUNT - 2);
+        s.recoverTokens(address(token), STREAM_AMOUNT - 2, payer);
     }
 }
 

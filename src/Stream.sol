@@ -53,7 +53,7 @@ contract Stream is IStream, Clone {
     );
 
     /// @notice Emitted when payer recovers excess stream payment tokens, or other ERC20 tokens accidentally sent to this stream
-    event TokensRecovered(address indexed payer, address tokenAddress, uint256 amount);
+    event TokensRecovered(address indexed payer, address tokenAddress, uint256 amount, address to);
 
     /// @notice Emitted when recovering ETH accidentally sent to this stream
     event ETHRescued(address indexed payer, address indexed to, uint256 amount);
@@ -271,35 +271,37 @@ contract Stream is IStream, Clone {
      * @dev Checking token balance before and after to defend against the case of multiple contracts
      * updating the balance of the same token.
      * @param tokenAddress the contract address of the token to recover.
+     * @param to the address to send the tokens to
      * @param amount the amount to recover.
      */
-    function recoverTokens(address tokenAddress, uint256 amount) public onlyPayer {
+    function recoverTokens(address tokenAddress, uint256 amount, address to) public onlyPayer {
         // When the stream is under-funded, it should keep its current balance
         // When it's sufficiently-funded, it should keep the full balance committed to recipient
         // i.e. `remainingBalance` or `recipientCancelBalance`
         uint256 requiredBalanceAfter =
             Math.min(tokenBalance(), Math.max(remainingBalance, recipientCancelBalance));
 
-        IERC20(tokenAddress).safeTransfer(msg.sender, amount);
+        IERC20(tokenAddress).safeTransfer(to, amount);
 
         if (tokenBalance() < requiredBalanceAfter) revert RescueTokenAmountExceedsExcessBalance();
 
-        emit TokensRecovered(msg.sender, tokenAddress, amount);
+        emit TokensRecovered(msg.sender, tokenAddress, amount, to);
     }
 
     /**
      * @notice Recover maximumal amount of payment by `payer`
      * This can be used after canceling a stream to withdraw all the unvested tokens
      * @dev Reverts when msg.sender is not this stream's payer
+     * @param to the address to send the tokens to
      * @return tokensToWithdraw the amount of tokens withdrawn
      */
-    function recoverTokens() external returns (uint256 tokensToWithdraw) {
+    function recoverTokens(address to) external returns (uint256 tokensToWithdraw) {
         uint256 requiredBalanceAfter =
             Math.min(tokenBalance(), Math.max(remainingBalance, recipientCancelBalance));
 
         tokensToWithdraw = tokenBalance() - requiredBalanceAfter;
 
-        recoverTokens(address(token()), tokensToWithdraw);
+        recoverTokens(address(token()), tokensToWithdraw, to);
     }
 
     /**
