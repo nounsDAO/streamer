@@ -31,6 +31,7 @@ export function handleTokensRecovered(event: TokensRecovered): void {
   tokenRecovery.stream = event.address;
   tokenRecovery.tokenAddress = event.params.tokenAddress;
   tokenRecovery.amount = event.params.amount;
+  tokenRecovery.sentTo = event.params.to;
 
   tokenRecovery.save();
 }

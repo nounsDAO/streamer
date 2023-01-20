@@ -82,6 +82,9 @@ type TokenRecovery @entity(immutable: true) {
 
   "The token amount."
   amount: BigInt!
+
+  "The address the tokens were sent to"
+  sentTo: Bytes!
 }
 
 type ETHRescue @entity(immutable: true) {
