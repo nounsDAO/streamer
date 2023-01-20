@@ -200,7 +200,7 @@ contract Stream is IStream, Clone {
      * Only this stream's payer or recipient can call this function.
      * @param amount the amount of tokens to withdraw.
      */
-    function withdraw(uint256 amount) external onlyPayerOrRecipient {
+    function withdraw(uint256 amount) public onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
 
@@ -250,7 +250,7 @@ contract Stream is IStream, Clone {
      * Only this stream's payer or recipient can call this function.
      * @param amount the amount of tokens to withdraw.
      */
-    function withdrawAfterCancel(uint256 amount) external onlyPayerOrRecipient {
+    function withdrawAfterCancel(uint256 amount) public onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
 
@@ -259,6 +259,14 @@ contract Stream is IStream, Clone {
         token().safeTransfer(recipient_, amount);
 
         emit TokensWithdrawn(msg.sender, recipient_, amount);
+    }
+
+    function withdrawAvailableBalance(uint256 amount) external {
+        if (recipientCancelBalance > 0) {
+            withdrawAfterCancel(amount);
+        } else {
+            withdraw(amount);
+        }
     }
 
     /**
@@ -395,6 +403,16 @@ contract Stream is IStream, Clone {
         }
 
         return balance;
+    }
+
+    function recipientAvailableBalance() external view returns (uint256) {
+        uint256 recipientCancelBalance_ = recipientCancelBalance;
+
+        if (recipientCancelBalance_ > 0) {
+            return recipientCancelBalance_;
+        } else {
+            return recipientBalance();
+        }
     }
 
     /**
