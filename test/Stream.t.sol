@@ -231,6 +231,20 @@ contract StreamWithdrawTest is StreamTest {
         s.withdrawAvailableBalance(STREAM_AMOUNT / 10);
         assertEq(token.balanceOf(recipient), STREAM_AMOUNT / 10);
     }
+
+    function test_withdrawAvailableBalance_revertsIfNotPayerOrRecipient() public {
+        token.mint(address(s), STREAM_AMOUNT);
+        vm.warp(startTime + DURATION / 10);
+
+        vm.expectRevert(abi.encodeWithSelector(Stream.CallerNotPayerOrRecipient.selector));
+        s.withdrawAvailableBalance(1);
+
+        vm.prank(recipient);
+        s.withdrawAvailableBalance(1);
+
+        vm.prank(payer);
+        s.withdrawAvailableBalance(1);
+    }
 }
 
 contract StreamBalanceOfTest is StreamTest {

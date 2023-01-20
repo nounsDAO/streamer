@@ -261,6 +261,11 @@ contract Stream is IStream, Clone {
         emit TokensWithdrawn(msg.sender, recipient_, amount);
     }
 
+    /**
+     * @notice Withdraw tokens to recipients's account. Works for both active and cancelled streams.
+     * @param amount the amount of tokens to withdraw
+     * @dev reverts if msg.sender is not the payer or the recipient
+     */
     function withdrawAvailableBalance(uint256 amount) external {
         if (recipientCancelBalance > 0) {
             withdrawAfterCancel(amount);
@@ -405,6 +410,9 @@ contract Stream is IStream, Clone {
         return balance;
     }
 
+    /**
+     * Returns the recipient balance. Works for both active and cancelled streams.
+     */
     function recipientAvailableBalance() external view returns (uint256) {
         uint256 recipientCancelBalance_ = recipientCancelBalance;
 
