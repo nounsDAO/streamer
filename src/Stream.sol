@@ -309,10 +309,11 @@ contract Stream is IStream, Clone {
      * @return tokensToWithdraw the amount of tokens withdrawn
      */
     function recoverTokens(address to) external returns (uint256 tokensToWithdraw) {
+        uint256 tokenBalance_ = tokenBalance();
         uint256 requiredBalanceAfter =
-            Math.min(tokenBalance(), Math.max(remainingBalance, recipientCancelBalance));
+            Math.min(tokenBalance_, Math.max(remainingBalance, recipientCancelBalance));
 
-        tokensToWithdraw = tokenBalance() - requiredBalanceAfter;
+        tokensToWithdraw = tokenBalance_ - requiredBalanceAfter;
 
         recoverTokens(address(token()), tokensToWithdraw, to);
     }
