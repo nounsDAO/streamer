@@ -44,7 +44,7 @@ templates:
         - event: StreamCancelled(indexed address,indexed address,indexed
             address,uint256)
           handler: handleStreamCancelled
-        - event: TokensRecovered(indexed address,address,uint256)
+        - event: TokensRecovered(indexed address,address,uint256,address)
           handler: handleTokensRecovered
         - event: ETHRescued(indexed address,indexed address,uint256)
           handler: handleETHRescued

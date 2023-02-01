@@ -103,6 +103,7 @@ export function createTokensRecoveredEvent(
   payer: Address,
   tokenAddress: Address,
   amount: BigInt,
+  to: Address
 ): TokensRecovered {
   let newEvent = changetype<TokensRecovered>(newMockEvent());
 
@@ -115,6 +116,7 @@ export function createTokensRecoveredEvent(
   newEvent.parameters.push(new ethereum.EventParam("payer", ethereum.Value.fromAddress(payer)));
   newEvent.parameters.push(new ethereum.EventParam("tokenAddress", ethereum.Value.fromAddress(tokenAddress)));
   newEvent.parameters.push(new ethereum.EventParam("amount", ethereum.Value.fromUnsignedBigInt(amount)));
+  newEvent.parameters.push(new ethereum.EventParam("to", ethereum.Value.fromAddress(to)));
 
   return newEvent;
 }

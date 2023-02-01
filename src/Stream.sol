@@ -53,7 +53,7 @@ contract Stream is IStream, Clone {
     );
 
     /// @notice Emitted when payer recovers excess stream payment tokens, or other ERC20 tokens accidentally sent to this stream
-    event TokensRecovered(address indexed payer, address tokenAddress, uint256 amount);
+    event TokensRecovered(address indexed payer, address tokenAddress, uint256 amount, address to);
 
     /// @notice Emitted when recovering ETH accidentally sent to this stream
     event ETHRescued(address indexed payer, address indexed to, uint256 amount);
@@ -200,11 +200,11 @@ contract Stream is IStream, Clone {
      * Only this stream's payer or recipient can call this function.
      * @param amount the amount of tokens to withdraw.
      */
-    function withdraw(uint256 amount) external onlyPayerOrRecipient {
+    function withdrawFromActiveBalance(uint256 amount) public onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
 
-        uint256 balance = recipientBalance();
+        uint256 balance = recipientActiveBalance();
         if (balance < amount) revert AmountExceedsBalance();
 
         // This is safe because it should always be the case that:
@@ -231,17 +231,17 @@ contract Stream is IStream, Clone {
 
         if (remainingBalance == 0) revert StreamNotActive();
 
-        uint256 recipientBalance_ = recipientBalance();
+        uint256 recipientActiveBalance_ = recipientActiveBalance();
 
         // This token amount is available to recipient to withdraw via `withdrawAfterCancel`.
-        recipientCancelBalance = recipientBalance_;
+        recipientCancelBalance = recipientActiveBalance_;
 
         // This zeroing is important because without it, it's possible for recipient to obtain additional funds
         // from this contract if anyone (e.g. payer) sends it tokens after cancellation.
         // Thanks to this state update, `balanceOf(recipient_)` will only return zero in future calls.
         remainingBalance = 0;
 
-        emit StreamCancelled(msg.sender, payer_, recipient_, recipientBalance_);
+        emit StreamCancelled(msg.sender, payer_, recipient_, recipientActiveBalance_);
     }
 
     /**
@@ -250,7 +250,7 @@ contract Stream is IStream, Clone {
      * Only this stream's payer or recipient can call this function.
      * @param amount the amount of tokens to withdraw.
      */
-    function withdrawAfterCancel(uint256 amount) external onlyPayerOrRecipient {
+    function withdrawAfterCancel(uint256 amount) public onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
 
@@ -259,6 +259,19 @@ contract Stream is IStream, Clone {
         token().safeTransfer(recipient_, amount);
 
         emit TokensWithdrawn(msg.sender, recipient_, amount);
+    }
+
+    /**
+     * @notice Withdraw tokens to recipients's account. Works for both active and cancelled streams.
+     * @param amount the amount of tokens to withdraw
+     * @dev reverts if msg.sender is not the payer or the recipient
+     */
+    function withdraw(uint256 amount) external {
+        if (recipientCancelBalance > 0) {
+            withdrawAfterCancel(amount);
+        } else {
+            withdrawFromActiveBalance(amount);
+        }
     }
 
     /**
@@ -271,20 +284,38 @@ contract Stream is IStream, Clone {
      * @dev Checking token balance before and after to defend against the case of multiple contracts
      * updating the balance of the same token.
      * @param tokenAddress the contract address of the token to recover.
+     * @param to the address to send the tokens to
      * @param amount the amount to recover.
      */
-    function recoverTokens(address tokenAddress, uint256 amount) external onlyPayer {
+    function recoverTokens(address tokenAddress, uint256 amount, address to) public onlyPayer {
         // When the stream is under-funded, it should keep its current balance
         // When it's sufficiently-funded, it should keep the full balance committed to recipient
         // i.e. `remainingBalance` or `recipientCancelBalance`
         uint256 requiredBalanceAfter =
             Math.min(tokenBalance(), Math.max(remainingBalance, recipientCancelBalance));
 
-        IERC20(tokenAddress).safeTransfer(msg.sender, amount);
+        IERC20(tokenAddress).safeTransfer(to, amount);
 
         if (tokenBalance() < requiredBalanceAfter) revert RescueTokenAmountExceedsExcessBalance();
 
-        emit TokensRecovered(msg.sender, tokenAddress, amount);
+        emit TokensRecovered(msg.sender, tokenAddress, amount, to);
+    }
+
+    /**
+     * @notice Recover maximumal amount of payment by `payer`
+     * This can be used after canceling a stream to withdraw all the unvested tokens
+     * @dev Reverts when msg.sender is not this stream's payer
+     * @param to the address to send the tokens to
+     * @return tokensToWithdraw the amount of tokens withdrawn
+     */
+    function recoverTokens(address to) external returns (uint256 tokensToWithdraw) {
+        uint256 tokenBalance_ = tokenBalance();
+        uint256 requiredBalanceAfter =
+            Math.min(tokenBalance_, Math.max(remainingBalance, recipientCancelBalance));
+
+        tokensToWithdraw = tokenBalance_ - requiredBalanceAfter;
+
+        recoverTokens(address(token()), tokensToWithdraw, to);
     }
 
     /**
@@ -336,7 +367,7 @@ contract Stream is IStream, Clone {
      * When a stream is cancelled this function always returns zero, to make sure that `withdraw` no longer sends any funds.
      * To learn the recipient's balance post-cancel use `recipientCancelBalance`.
      */
-    function recipientBalance() public view returns (uint256) {
+    function recipientActiveBalance() public view returns (uint256) {
         uint256 startTime_ = startTime();
         uint256 stopTime_ = stopTime();
         uint256 blockTime = block.timestamp;
@@ -378,6 +409,19 @@ contract Stream is IStream, Clone {
         }
 
         return balance;
+    }
+
+    /**
+     * Returns the recipient balance. Works for both active and cancelled streams.
+     */
+    function recipientBalance() external view returns (uint256) {
+        uint256 recipientCancelBalance_ = recipientCancelBalance;
+
+        if (recipientCancelBalance_ > 0) {
+            return recipientCancelBalance_;
+        } else {
+            return recipientActiveBalance();
+        }
     }
 
     /**

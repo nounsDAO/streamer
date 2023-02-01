@@ -104,9 +104,10 @@ describe("Stream", () => {
     const timestamp = BigInt.fromI32(1000);
     const tokenAddress = Address.fromString("0x0000000000000000000000000000000000000042");
     const amount = BigInt.fromI32(4321);
+    const to = Address.fromString("0x0000000000000000000000000000000000000043");
 
     handleTokensRecovered(
-      createTokensRecoveredEvent(txHash, logIndex, timestamp, streamAddress, payerAddress, tokenAddress, amount),
+      createTokensRecoveredEvent(txHash, logIndex, timestamp, streamAddress, payerAddress, tokenAddress, amount, to),
     );
 
     const tr = TokenRecovery.load(txHash.toHex() + "-" + logIndex.toString());
@@ -115,6 +116,7 @@ describe("Stream", () => {
     assert.stringEquals(tr!.stream.toHex(), streamAddress.toHex());
     assert.stringEquals(tr!.tokenAddress.toHex(), tokenAddress.toHex());
     assert.bigIntEquals(tr!.amount, amount);
+    assert.stringEquals(tr!.sentTo.toHex(), to.toHex());
   });
 
   test("Creates a new ETHRescue", () => {
