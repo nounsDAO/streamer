@@ -200,11 +200,11 @@ contract Stream is IStream, Clone {
      * Only this stream's payer or recipient can call this function.
      * @param amount the amount of tokens to withdraw.
      */
-    function withdraw(uint256 amount) public onlyPayerOrRecipient {
+    function withdrawFromActiveBalance(uint256 amount) public onlyPayerOrRecipient {
         if (amount == 0) revert CantWithdrawZero();
         address recipient_ = recipient();
 
-        uint256 balance = recipientBalance();
+        uint256 balance = recipientActiveBalance();
         if (balance < amount) revert AmountExceedsBalance();
 
         // This is safe because it should always be the case that:
@@ -231,17 +231,17 @@ contract Stream is IStream, Clone {
 
         if (remainingBalance == 0) revert StreamNotActive();
 
-        uint256 recipientBalance_ = recipientBalance();
+        uint256 recipientActiveBalance_ = recipientActiveBalance();
 
         // This token amount is available to recipient to withdraw via `withdrawAfterCancel`.
-        recipientCancelBalance = recipientBalance_;
+        recipientCancelBalance = recipientActiveBalance_;
 
         // This zeroing is important because without it, it's possible for recipient to obtain additional funds
         // from this contract if anyone (e.g. payer) sends it tokens after cancellation.
         // Thanks to this state update, `balanceOf(recipient_)` will only return zero in future calls.
         remainingBalance = 0;
 
-        emit StreamCancelled(msg.sender, payer_, recipient_, recipientBalance_);
+        emit StreamCancelled(msg.sender, payer_, recipient_, recipientActiveBalance_);
     }
 
     /**
@@ -266,11 +266,11 @@ contract Stream is IStream, Clone {
      * @param amount the amount of tokens to withdraw
      * @dev reverts if msg.sender is not the payer or the recipient
      */
-    function withdrawAvailableBalance(uint256 amount) external {
+    function withdraw(uint256 amount) external {
         if (recipientCancelBalance > 0) {
             withdrawAfterCancel(amount);
         } else {
-            withdraw(amount);
+            withdrawFromActiveBalance(amount);
         }
     }
 
@@ -367,7 +367,7 @@ contract Stream is IStream, Clone {
      * When a stream is cancelled this function always returns zero, to make sure that `withdraw` no longer sends any funds.
      * To learn the recipient's balance post-cancel use `recipientCancelBalance`.
      */
-    function recipientBalance() public view returns (uint256) {
+    function recipientActiveBalance() public view returns (uint256) {
         uint256 startTime_ = startTime();
         uint256 stopTime_ = stopTime();
         uint256 blockTime = block.timestamp;
@@ -414,13 +414,13 @@ contract Stream is IStream, Clone {
     /**
      * Returns the recipient balance. Works for both active and cancelled streams.
      */
-    function recipientAvailableBalance() external view returns (uint256) {
+    function recipientBalance() external view returns (uint256) {
         uint256 recipientCancelBalance_ = recipientCancelBalance;
 
         if (recipientCancelBalance_ > 0) {
             return recipientCancelBalance_;
         } else {
-            return recipientBalance();
+            return recipientActiveBalance();
         }
     }
 
