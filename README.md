@@ -198,12 +198,5 @@ Querying works as outlined above for local testing.
 
 | Contract      | Address                                                                                                                      |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| StreamFactory | [0x404603ceF86A2010B2022f184d00a57ba25256C6](https://goerli.etherscan.io/address/0x404603ceF86A2010B2022f184d00a57ba25256C6) |
-| Stream        | [0x0F56690520Fa0ca09fBEF06642f07700788D7451](https://goerli.etherscan.io/address/0x0F56690520Fa0ca09fBEF06642f07700788D7451) |
-
-### Sepolia
-
-| Contract      | Address                                                                                                                       |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| StreamFactory | [0xb78ccF3BD015f209fb9B2d3d132FD8784Df78DF5](https://sepolia.etherscan.io/address/0xb78ccF3BD015f209fb9B2d3d132FD8784Df78DF5) |
-| Stream        | [0xD7b4CcF4fB555b4743F2138aDC41E0EA41Ab00A0](https://sepolia.etherscan.io/address/0xD7b4CcF4fB555b4743F2138aDC41E0EA41Ab00A0) |
+| StreamFactory | [0xc08a287eCB16CeD801f28Bb011924f7DE5Cc53a3](https://goerli.etherscan.io/address/0xc08a287eCB16CeD801f28Bb011924f7DE5Cc53a3) |
+| Stream        | [0x20ffE6b3b08f5009788812583D42C5b42bf44447](https://goerli.etherscan.io/address/0x20ffE6b3b08f5009788812583D42C5b42bf44447) |
