@@ -191,8 +191,8 @@ Querying works as outlined above for local testing.
 
 | Contract      | Address                                                                                                               |
 | ------------- | --------------------------------------------------------------------------------------------------------------------- |
-| StreamFactory | [0x5CCA4E05Eb2E5f5c40945C24d3d3ea48C15a4Ad0](https://etherscan.io/address/0x5CCA4E05Eb2E5f5c40945C24d3d3ea48C15a4Ad0) |
-| Stream        | [0xe6c0415dA31A2f270411945535528404a4515016](https://etherscan.io/address/0xe6c0415dA31A2f270411945535528404a4515016) |
+| StreamFactory | [0x0fd206FC7A7dBcD5661157eDCb1FFDD0D02A61ff](https://etherscan.io/address/0x0fd206FC7A7dBcD5661157eDCb1FFDD0D02A61ff) |
+| Stream        | [0x0b9dFf1aba32A9fa95011C7f097ec672F689038F](https://etherscan.io/address/0x0b9dFf1aba32A9fa95011C7f097ec672F689038F) |
 
 ### Goerli
 
